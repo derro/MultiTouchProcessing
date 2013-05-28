@@ -1,9 +1,8 @@
+import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Graphics;
 
-import javax.swing.JComponent;
-
-public class Blob extends JComponent {
+public class Blob extends Canvas {
 	public int xMin;
 	public int xMax;
 	public int yMin;
@@ -24,20 +23,19 @@ public class Blob extends JComponent {
 		return id;
 	}
 
-
-
 	public void setId(int id) {
 		this.id = id;
 	}
 
-	@Override
 	public String toString()
 	{
 		return String.format("id %d: %4d -> %4d, Y: %4d -> %4d, mass: %6d", id, xMin, xMax, yMin, yMax, mass);
 	}
 	
-	public void paint(Graphics g) {
-		//System.out.println("draw blob: " +  this.toString());
+	@Override
+	public void paint(final Graphics g) {
+		super.paint(g);
+		System.out.println("draw blob: " +  this.toString());
 		g.setColor(Color.RED);
 		g.drawRect(this.xMin*Configuration.pixelSize , this.yMin* Configuration.pixelSize, (this.xMax-this.xMin+1)*Configuration.pixelSize, (this.yMax-this.yMin+1)*Configuration.pixelSize);
 	}

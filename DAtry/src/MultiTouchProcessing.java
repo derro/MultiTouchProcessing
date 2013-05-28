@@ -1,5 +1,10 @@
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Canvas;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.LayoutManager;
 import java.awt.Panel;
 import java.awt.Rectangle;
@@ -18,22 +23,29 @@ import java.util.ArrayList;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
+import javax.swing.OverlayLayout;
 
-public class Main {
-	public static SerialDevice serialDevice = null;
-	public static DataManager dataManager = null;
-
-	public static boolean ending = false;
+public class MultiTouchProcessing {
 	public static Crosspoint[][] crosspoints;
 	public static DrawMeasuredData[][] rects;
-	public static JFrame frame;
-	public static JFrame blobFrame;
-	public static JPanel blobPanel;
-	public static ArrayList<Blob> drawnBlobs;
 	
-	public static double[][] binaryData = new double[Configuration.verticalWires][Configuration.horizontalWires]; 
+	public SerialDevice serialDevice = null;
+	public DataManager dataManager = null;
+
+	public boolean ending = false;
+	
+	public JFrame frame;
+	public JFrame blobFrame;
+	public JPanel blobPanel;
+	public ArrayList<Blob> drawnBlobs;
+	
+	public double[][] binaryData = new double[Configuration.verticalWires][Configuration.horizontalWires]; 
 
 	public static void main(String[] args) throws InterruptedException, IOException {
+		MultiTouchProcessing mtp = new MultiTouchProcessing();
+	}
+	
+	public MultiTouchProcessing() {
 		// SWING FRAME
 		frame = new JFrame("Data Visualization");
 		frame.setSize(new Dimension(Configuration.verticalWires * Configuration.pixelSize + Configuration.verticalWires * Configuration.pixelSpace, Configuration.horizontalWires * Configuration.pixelSize + Configuration.horizontalWires * Configuration.pixelSpace + 70));
@@ -54,13 +66,16 @@ public class Main {
 		blobFrame.setPreferredSize(new Dimension(Configuration.verticalWires * Configuration.pixelSize + Configuration.verticalWires * Configuration.pixelSpace + 20, Configuration.horizontalWires * Configuration.pixelSize + Configuration.horizontalWires * Configuration.pixelSpace + 40));
 		blobFrame.setVisible(true);
 		blobFrame.setLocation(frame.getSize().width,0);
-		//JPanel panel = new JPanel();
-		//panel.setSize(Configuration.verticalWires * Configuration.pixelSize + Configuration.verticalWires * Configuration.pixelSpace + 20, Configuration.horizontalWires * Configuration.pixelSize + Configuration.horizontalWires * Configuration.pixelSpace + 40);
-		//blobFrame.setLayout()
+		
+		blobPanel = new JPanel();
+		blobPanel.setBackground(Color.DARK_GRAY);
+		blobPanel.setLayout(new OverlayLayout(blobPanel));
+		blobPanel.setSize(Configuration.verticalWires * Configuration.pixelSize + Configuration.verticalWires * Configuration.pixelSpace + 20, Configuration.horizontalWires * Configuration.pixelSize + Configuration.horizontalWires * Configuration.pixelSpace + 40);
+		blobFrame.add(blobPanel, BorderLayout.CENTER);
+		
 		blobFrame.pack();
 
 		// INITIALIZATION
-		GaussianBlur gaus = new GaussianBlur();
 		drawnBlobs = new ArrayList<Blob>();
 		dataManager = new DataManager();
 		crosspoints = new Crosspoint[Configuration.verticalWires][Configuration.horizontalWires];
@@ -75,94 +90,114 @@ public class Main {
 			}
 		}
 		
-		// REAL DATA
 		if (Configuration.realData) {
-			serialDevice = new SerialDevice("/dev/tty.usbserial-A4001KsV");
-			if (!serialDevice.openPort()) {
-				return;
-			}
-
-			Thread.sleep(5000);
-			serialDevice.writeData("s\n");
-			Thread.sleep(200);
-		
-			int run = 0;
-			while (!ending) {
-				byte[] data = serialDevice.readData((Configuration.verticalWires * Configuration.horizontalWires * 10 / 8));
-				
-				dataManager.consumeSerialBuffer(data,(run<40),!Configuration.useGauss);
-				if(!(run<40) && Configuration.useGauss)
-					gaus.apply(false);
-				if(!(run<40) && Configuration.useTreshold)
-					applyTreshold();
-				if(!(run<40) && Configuration.blobDetection && run%100==0) {
-					//printSignalData();
-					//printBinaryData();
-					applyBlobDetection(run<=100);
-				}
-				
-				frame.validate();
-				frame.repaint();
-				
-				/*
-				if (run % 50 == 0) {
-					dataManager.printData(run);
-				}*/
-				run++; 
-			}
-			serialDevice.closePort();
+			// REAL DATA
+			processRealData();
 		} else {
-		//FAKE DATA
-			try {
-				BufferedReader br = new BufferedReader(new FileReader(
-						"fakehand.txt"));
-
-				String msr = br.readLine();
-				String avg = br.readLine();
-				if(msr != null && avg != null) {
-					String average[] = avg.split(",");
-					String signalStrength[] = msr .split(",");
-
-					int k = 0;
-					for (int i = 0; i < Configuration.verticalWires; i++) {
-				      for (int j = 0; j < Configuration.horizontalWires; j++) {
-				        crosspoints[i][j].setMeasuredSignalAverage(Double.parseDouble(average[k]));    
-				        double signal = new Double(signalStrength[k]);
-				        crosspoints[i][j].calculateSignalStrength((int)signal);
-				        rects[i][j].setValue(crosspoints[i][j].getSignalStrength());
-				        k++;
-				      }
-				    }
-				}
-				br.close();
-				if(Configuration.useGauss)
-					gaus.apply(true);
-				
-				if((Configuration.useTreshold)) {
-					printSignalData();
-					applyTreshold();
-					printBinaryData();
-				}
-				
-				if((Configuration.blobDetection)) {
-					applyBlobDetection(true);
-				}	
-				
-				frame.validate();
-				frame.repaint();
-				
-				//frame.revalidate();
-				//dataManager.printData(1);
-			} catch (FileNotFoundException e) {
-				System.out.println("File not found");
-			} catch (IOException e) {
-				System.out.println("IO exception");
-			}
-
+			//FAKE DATA
+			processFakeData();
 		}
 	}
 
-	public static void applyBlobDetection(boolean first) {
+	private void processFakeData() {
+		GaussianBlur gaus = new GaussianBlur();
+		try {
+			BufferedReader br = new BufferedReader(new FileReader(
+					"fakehand.txt"));
+
+			String msr = br.readLine();
+			String avg = br.readLine();
+			if(msr != null && avg != null) {
+				String average[] = avg.split(",");
+				String signalStrength[] = msr .split(",");
+
+				int k = 0;
+				for (int i = 0; i < Configuration.verticalWires; i++) {
+			      for (int j = 0; j < Configuration.horizontalWires; j++) {
+			        crosspoints[i][j].setMeasuredSignalAverage(Double.parseDouble(average[k]));    
+			        double signal = new Double(signalStrength[k]);
+			        crosspoints[i][j].calculateSignalStrength((int)signal);
+			        rects[i][j].setValue(crosspoints[i][j].getSignalStrength());
+			        k++;
+			      }
+			    }
+			}
+			br.close();
+			if(Configuration.useGauss)
+				gaus.apply(true);
+			
+			if((Configuration.useTreshold)) {
+				printSignalData();
+				applyTreshold();
+				printBinaryData();
+			}
+			
+			if((Configuration.blobDetection)) {
+				applyBlobDetection(true);
+			}	
+			
+			frame.validate();
+			frame.repaint();
+			
+			blobFrame.validate();
+			blobFrame.repaint();
+			
+			//blobFrame.repaint();
+			
+			//frame.revalidate();
+			//dataManager.printData(1);
+		} catch (FileNotFoundException e) {
+			System.out.println("File not found");
+		} catch (IOException e) {
+			System.out.println("IO exception");
+		}
+	}
+
+	private void processRealData() {
+		GaussianBlur gaus = new GaussianBlur();
+		
+		serialDevice = new SerialDevice("/dev/tty.usbserial-A4001KsV");
+		if (!serialDevice.openPort()) {
+			return;
+		}
+
+		try {
+			Thread.sleep(5000);
+			serialDevice.writeData("s\n");
+			Thread.sleep(200);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		int run = 0;
+		while (!ending) {
+			byte[] data = serialDevice.readData((Configuration.verticalWires * Configuration.horizontalWires * 10 / 8));
+			
+			dataManager.consumeSerialBuffer(data,(run<40),!Configuration.useGauss);
+			if(!(run<40) && Configuration.useGauss)
+				gaus.apply(false);
+			if(!(run<40) && Configuration.useTreshold)
+				applyTreshold();
+			if(!(run<40) && Configuration.blobDetection && run%100==0) {
+				//printSignalData();
+				//printBinaryData();
+				applyBlobDetection(run<=100);
+			}
+			
+			frame.validate();
+			frame.repaint();
+			
+			/*
+			if (run % 50 == 0) {
+				dataManager.printData(run);
+			}*/
+			run++; 
+		}
+		serialDevice.closePort();
+	}
+
+	public void applyBlobDetection(boolean first) {
 		double[] binaryOneDim = new double[Configuration.verticalWires*Configuration.horizontalWires];
 		int s = 0;
 		for (int i = 0; i < Configuration.horizontalWires; i++) {
@@ -193,7 +228,34 @@ public class Main {
 		drawBlobs(blobList, first);
 	}
 	
-	public static void applyTreshold() {
+	public void drawBlobs(ArrayList<Blob> blobList, boolean first) {
+		blobFrame.getContentPane().removeAll();
+
+		/*for(Blob b : drawnBlobs) {
+			blobFrame.remove(b);
+			//frame.revalidate();
+		}
+		drawnBlobs.clear();
+		*/
+
+		for(Blob b : blobList) {
+			blobFrame.getContentPane().add(b);
+			//drawnBlobs.add(b);
+			blobFrame.setComponentZOrder(b, 0);
+			blobFrame.revalidate();
+		}
+		if(first)
+			blobFrame.validate();
+		else {
+			blobFrame.revalidate();
+		}
+		blobFrame.repaint();
+		//frame.pack();
+		
+		System.out.println("Count of Components: " + blobPanel.getComponentCount());
+	}
+	
+	public void applyTreshold() {
 		for (int i = 0; i < Configuration.verticalWires; i++) {
 		      for (int j = 0; j < Configuration.horizontalWires; j++) {
 		        double signal = crosspoints[i][j].getSignalStrength();
@@ -217,7 +279,7 @@ public class Main {
 		//printBinaryData();
 	}
 	
-	public static void printSignalData() {
+	public void printSignalData() {
 		StringBuilder sb = new StringBuilder();
 		DecimalFormat df = new DecimalFormat(".000");
 		for (int i = 0; i < Configuration.horizontalWires; i++) {
@@ -233,7 +295,7 @@ public class Main {
 		System.out.println(sb.toString());
 	}
 	
-	public static void printBinaryData() {
+	public void printBinaryData() {
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < Configuration.horizontalWires; i++) {
 		      for (int j = 0; j < Configuration.verticalWires; j++) {
@@ -248,7 +310,7 @@ public class Main {
 		System.out.println(sb.toString());
 	}
 	
-	public static void printBinaryDataOneDim(double array[]) {
+	public void printBinaryDataOneDim(double array[]) {
 		StringBuilder sb = new StringBuilder();
 		int i = 1;
 		for(double d : array) {
@@ -264,33 +326,7 @@ public class Main {
 		System.out.println(sb.toString());
 	}
 	
-	public static void drawBlobs(ArrayList<Blob> blobList, boolean first) {
-		blobFrame.getContentPane().removeAll();
-		
-		/*for(Blob b : drawnBlobs) {
-			blobFrame.remove(b);
-			//frame.revalidate();
-		}
-		drawnBlobs.clear();
-		*/
-		
-		for(Blob b : blobList) {
-			blobFrame.getContentPane().add(b);
-			//drawnBlobs.add(b);
-			blobFrame.setComponentZOrder(b, 0);
-			blobFrame.revalidate();
-		}
-		if(first)
-			blobFrame.validate();
-		else {
-			blobFrame.revalidate();
-		}
-		blobFrame.repaint();
-		//frame.pack();
-		
-	}
-	
-	public static void printDataInFile() throws IOException {
+	public void printDataInFile() throws IOException {
 		File file = new File("calculateddata.txt");
 		if (!file.exists()) {
 			file.createNewFile();

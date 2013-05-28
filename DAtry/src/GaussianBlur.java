@@ -58,20 +58,17 @@ public class GaussianBlur {
 						for(int yg=0; yg<kernelsize; yg++) {
 							int x2 = xg-max;
 							int y2 = yg-max;
-							double signal = Main.crosspoints[x+x2][y+y2].getSignalStrength();
+							double signal = MultiTouchProcessing.crosspoints[x+x2][y+y2].getSignalStrength();
 							weightedValues[xg][yg] = signal * kernel[xg][yg];
 						}
 					}
 					double sum = calculateSum(weightedValues);
-					Main.crosspoints[x][y].setSignalStrength(sum);
+					MultiTouchProcessing.crosspoints[x][y].setSignalStrength(sum);
 					if(draw)
-						Main.rects[x][y].setValue(sum);
+						MultiTouchProcessing.rects[x][y].setValue(sum);
 				}
 			}
 		}
-		if(draw) {
-			Main.frame.repaint();
-		}	
 	}
 
 	private double calculateSum(double[][] weightedValues) {
