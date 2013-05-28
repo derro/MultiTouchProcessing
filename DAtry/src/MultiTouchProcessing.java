@@ -1,13 +1,6 @@
-import java.awt.BasicStroke;
 import java.awt.BorderLayout;
-import java.awt.Canvas;
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.LayoutManager;
-import java.awt.Panel;
-import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedReader;
@@ -23,7 +16,6 @@ import java.util.ArrayList;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
-import javax.swing.OverlayLayout;
 
 public class MultiTouchProcessing {
 	public static Crosspoint[][] crosspoints;
@@ -42,7 +34,7 @@ public class MultiTouchProcessing {
 	public double[][] binaryData = new double[Configuration.verticalWires][Configuration.horizontalWires]; 
 
 	public static void main(String[] args) throws InterruptedException, IOException {
-		MultiTouchProcessing mtp = new MultiTouchProcessing();
+		new MultiTouchProcessing();
 	}
 	
 	public MultiTouchProcessing() {
@@ -55,6 +47,7 @@ public class MultiTouchProcessing {
 		JButton b = new JButton("Stop");
 		frame.add(b);
 		ActionListener al = new ActionListener() {
+			@Override
 			public void actionPerformed(ActionEvent e) {
 				ending = true;
 			}
@@ -69,7 +62,7 @@ public class MultiTouchProcessing {
 		
 		blobPanel = new JPanel();
 		blobPanel.setBackground(Color.DARK_GRAY);
-		blobPanel.setLayout(new OverlayLayout(blobPanel));
+		blobPanel.setLayout(null);
 		blobPanel.setSize(Configuration.verticalWires * Configuration.pixelSize + Configuration.verticalWires * Configuration.pixelSpace + 20, Configuration.horizontalWires * Configuration.pixelSize + Configuration.horizontalWires * Configuration.pixelSpace + 40);
 		blobFrame.add(blobPanel, BorderLayout.CENTER);
 		
@@ -179,7 +172,7 @@ public class MultiTouchProcessing {
 				gaus.apply(false);
 			if(!(run<40) && Configuration.useTreshold)
 				applyTreshold();
-			if(!(run<40) && Configuration.blobDetection && run%100==0) {
+			if(!(run<40) && Configuration.blobDetection) {
 				//printSignalData();
 				//printBinaryData();
 				applyBlobDetection(run<=100);
@@ -229,7 +222,9 @@ public class MultiTouchProcessing {
 	}
 	
 	public void drawBlobs(ArrayList<Blob> blobList, boolean first) {
-		blobFrame.getContentPane().removeAll();
+		System.out.println("draw called");
+		//blobFrame.getContentPane().removeAll();
+		blobPanel.removeAll();
 
 		/*for(Blob b : drawnBlobs) {
 			blobFrame.remove(b);
@@ -239,18 +234,19 @@ public class MultiTouchProcessing {
 		*/
 
 		for(Blob b : blobList) {
-			blobFrame.getContentPane().add(b);
+			//blobFrame.add(b);
+			blobPanel.add(b);
+			//b.setBounds(blobPanel.getBounds());
+			//System.out.println(b.getBounds());
 			//drawnBlobs.add(b);
-			blobFrame.setComponentZOrder(b, 0);
-			blobFrame.revalidate();
+			//blobPanel.setComponentZOrder(b, 0);
+			//blobFrame.revalidate();
+			//blobFrame.validate();
 		}
-		if(first)
-			blobFrame.validate();
-		else {
-			blobFrame.revalidate();
-		}
-		blobFrame.repaint();
-		//frame.pack();
+		blobPanel.validate();
+		blobPanel.repaint();
+		//blobPanel.pack();
+		//blobFrame.pack();
 		
 		System.out.println("Count of Components: " + blobPanel.getComponentCount());
 	}

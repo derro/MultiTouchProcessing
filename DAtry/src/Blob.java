@@ -1,8 +1,9 @@
-import java.awt.Canvas;
 import java.awt.Color;
-import java.awt.Graphics;
+import javax.swing.JPanel;
 
-public class Blob extends Canvas {
+public class Blob extends JPanel {
+	private static final long serialVersionUID = 1L;
+	
 	public int xMin;
 	public int xMax;
 	public int yMin;
@@ -17,6 +18,11 @@ public class Blob extends Canvas {
 		this.yMin = yMin;
 		this.yMax = yMax;
 		this.mass = mass;
+		
+		//Stuff for drawing BLOB
+		this.setBounds(this.xMin*Configuration.pixelSize , this.yMin* Configuration.pixelSize, (this.xMax-this.xMin+1)*Configuration.pixelSize, (this.yMax-this.yMin+1)*Configuration.pixelSize);
+		this.setBackground(new Color(1f, 1f, 1f, 0.3f));
+		this.setBorder(javax.swing.BorderFactory.createLineBorder(new Color(0.1f, 1f, 1f, 0.9f)));
 	}
 
 	public int getId() {
@@ -27,16 +33,20 @@ public class Blob extends Canvas {
 		this.id = id;
 	}
 
+	@Override
 	public String toString()
 	{
 		return String.format("id %d: %4d -> %4d, Y: %4d -> %4d, mass: %6d", id, xMin, xMax, yMin, yMax, mass);
 	}
 	
-	@Override
-	public void paint(final Graphics g) {
-		super.paint(g);
-		System.out.println("draw blob: " +  this.toString());
-		g.setColor(Color.RED);
-		g.drawRect(this.xMin*Configuration.pixelSize , this.yMin* Configuration.pixelSize, (this.xMax-this.xMin+1)*Configuration.pixelSize, (this.yMax-this.yMin+1)*Configuration.pixelSize);
-	}
+//	@Override
+//	public void paint(final Graphics g) {
+//		System.out.println("draw blob: " +  this.toString());
+//		g.setColor(Color.BLUE);
+//		//g.drawRect(this.xMin*Configuration.pixelSize , this.yMin* Configuration.pixelSize, (this.xMax-this.xMin+1)*Configuration.pixelSize, (this.yMax-this.yMin+1)*Configuration.pixelSize);
+//		//g.fillRect(this.xMin*Configuration.pixelSize , this.yMin* Configuration.pixelSize, (this.xMax-this.xMin+1)*Configuration.pixelSize, (this.yMax-this.yMin+1)*Configuration.pixelSize);
+//		//Rectangle r = this.getBounds();
+//		//g.drawRect(r.x, r.y, r.width, r.height);
+//		super.paint(g);
+//	}
 }

@@ -1,10 +1,11 @@
-import java.awt.Canvas;
 import java.awt.Graphics;
 import java.awt.Color;
 
 import javax.swing.JComponent;
 
 public class DrawMeasuredData extends JComponent {
+	private static final long serialVersionUID = 1L;
+	
 	int x = 0;
 	int y = 0;
 	int width = 0;
@@ -26,6 +27,7 @@ public class DrawMeasuredData extends JComponent {
 		this.color = (int) Math.round(value * 255);
 	}
 	
+	@Override
 	public void paint(Graphics g) {
 		g.setColor(new Color(this.color,this.color,this.color));
 		g.fillRect(this.x, this.y, this.width, this.length);
