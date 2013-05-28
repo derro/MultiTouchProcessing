@@ -38,15 +38,4 @@ public class Blob extends JPanel {
 	{
 		return String.format("id %d: %4d -> %4d, Y: %4d -> %4d, mass: %6d", id, xMin, xMax, yMin, yMax, mass);
 	}
-	
-//	@Override
-//	public void paint(final Graphics g) {
-//		System.out.println("draw blob: " +  this.toString());
-//		g.setColor(Color.BLUE);
-//		//g.drawRect(this.xMin*Configuration.pixelSize , this.yMin* Configuration.pixelSize, (this.xMax-this.xMin+1)*Configuration.pixelSize, (this.yMax-this.yMin+1)*Configuration.pixelSize);
-//		//g.fillRect(this.xMin*Configuration.pixelSize , this.yMin* Configuration.pixelSize, (this.xMax-this.xMin+1)*Configuration.pixelSize, (this.yMax-this.yMin+1)*Configuration.pixelSize);
-//		//Rectangle r = this.getBounds();
-//		//g.drawRect(r.x, r.y, r.width, r.height);
-//		super.paint(g);
-//	}
 }

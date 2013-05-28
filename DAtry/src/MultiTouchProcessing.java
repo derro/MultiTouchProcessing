@@ -29,7 +29,6 @@ public class MultiTouchProcessing {
 	public JFrame frame;
 	public JFrame blobFrame;
 	public JPanel blobPanel;
-	public ArrayList<Blob> drawnBlobs;
 	
 	public double[][] binaryData = new double[Configuration.verticalWires][Configuration.horizontalWires]; 
 
@@ -69,7 +68,6 @@ public class MultiTouchProcessing {
 		blobFrame.pack();
 
 		// INITIALIZATION
-		drawnBlobs = new ArrayList<Blob>();
 		dataManager = new DataManager();
 		crosspoints = new Crosspoint[Configuration.verticalWires][Configuration.horizontalWires];
 		rects = new DrawMeasuredData[Configuration.verticalWires][Configuration.horizontalWires];
@@ -132,12 +130,9 @@ public class MultiTouchProcessing {
 			frame.validate();
 			frame.repaint();
 			
-			blobFrame.validate();
-			blobFrame.repaint();
-			
+			//blobFrame.validate();
 			//blobFrame.repaint();
 			
-			//frame.revalidate();
 			//dataManager.printData(1);
 		} catch (FileNotFoundException e) {
 			System.out.println("File not found");
@@ -222,33 +217,13 @@ public class MultiTouchProcessing {
 	}
 	
 	public void drawBlobs(ArrayList<Blob> blobList, boolean first) {
-		System.out.println("draw called");
-		//blobFrame.getContentPane().removeAll();
 		blobPanel.removeAll();
 
-		/*for(Blob b : drawnBlobs) {
-			blobFrame.remove(b);
-			//frame.revalidate();
-		}
-		drawnBlobs.clear();
-		*/
-
 		for(Blob b : blobList) {
-			//blobFrame.add(b);
 			blobPanel.add(b);
-			//b.setBounds(blobPanel.getBounds());
-			//System.out.println(b.getBounds());
-			//drawnBlobs.add(b);
-			//blobPanel.setComponentZOrder(b, 0);
-			//blobFrame.revalidate();
-			//blobFrame.validate();
 		}
 		blobPanel.validate();
 		blobPanel.repaint();
-		//blobPanel.pack();
-		//blobFrame.pack();
-		
-		System.out.println("Count of Components: " + blobPanel.getComponentCount());
 	}
 	
 	public void applyTreshold() {
