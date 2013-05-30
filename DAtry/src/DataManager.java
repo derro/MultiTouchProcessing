@@ -21,6 +21,10 @@ public class DataManager {
 					MultiTouchProcessing.crosspoints[x][y].accumulateAvgSig(sig);
 				} else {
 					MultiTouchProcessing.crosspoints[x][y].calculateSignalStrength(sig);
+
+					//Remove border measure values for getting better graphics
+					if(x <= Configuration.removeBorderVal-1 || y <= Configuration.removeBorderVal-1 || x >= Configuration.verticalWires-Configuration.removeBorderVal || y >= Configuration.horizontalWires-Configuration.removeBorderVal)
+						MultiTouchProcessing.crosspoints[x][y].setSignalStrength(0.0);
 					if(draw)
 						MultiTouchProcessing.rects[x][y].setValue(MultiTouchProcessing.crosspoints[x][y].getSignalStrength());
 				}

@@ -15,11 +15,13 @@ import java.util.ArrayList;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 
 public class MultiTouchProcessing {
 	public static Crosspoint[][] crosspoints;
 	public static DrawMeasuredData[][] rects;
+	public static HistogrammValue[] histogrammValues;
 	
 	public SerialDevice serialDevice = null;
 	public DataManager dataManager = null;
@@ -29,6 +31,8 @@ public class MultiTouchProcessing {
 	public JFrame frame;
 	public JFrame blobFrame;
 	public JPanel blobPanel;
+	public JLabel frameLabel;
+	public JPanel histoPanel;
 	
 	public double[][] binaryData = new double[Configuration.verticalWires][Configuration.horizontalWires]; 
 
@@ -39,7 +43,7 @@ public class MultiTouchProcessing {
 	public MultiTouchProcessing() {
 		// SWING FRAME
 		frame = new JFrame("Data Visualization");
-		frame.setSize(new Dimension(Configuration.verticalWires * Configuration.pixelSize + Configuration.verticalWires * Configuration.pixelSpace, Configuration.horizontalWires * Configuration.pixelSize + Configuration.horizontalWires * Configuration.pixelSpace + 70));
+		frame.setSize(new Dimension(Configuration.verticalWires * Configuration.pixelSize + Configuration.verticalWires * Configuration.pixelSpace, Configuration.horizontalWires * Configuration.pixelSize + Configuration.horizontalWires * Configuration.pixelSpace + 300));
 		frame.setVisible(true);
 		//frame.pack();
 		
@@ -53,6 +57,17 @@ public class MultiTouchProcessing {
 		};
 		b.addActionListener(al);
 		b.setBounds(20, 450, 40,20);
+		
+		frameLabel = new JLabel("Starting device...");
+		frame.add(frameLabel);
+		frameLabel.setBounds(70, 445, 400, 30);
+		
+		histoPanel = new JPanel();
+		frame.add(histoPanel);
+		histoPanel.setBackground(Color.DARK_GRAY);
+		histoPanel.setLayout(null);
+		histoPanel.setSize(300,100);
+		histoPanel.setBounds(0, 500, 300, 100);
 		
 		blobFrame = new JFrame("Data Visualization - Blobs");
 		blobFrame.setPreferredSize(new Dimension(Configuration.verticalWires * Configuration.pixelSize + Configuration.verticalWires * Configuration.pixelSpace + 20, Configuration.horizontalWires * Configuration.pixelSize + Configuration.horizontalWires * Configuration.pixelSpace + 40));
@@ -71,6 +86,7 @@ public class MultiTouchProcessing {
 		dataManager = new DataManager();
 		crosspoints = new Crosspoint[Configuration.verticalWires][Configuration.horizontalWires];
 		rects = new DrawMeasuredData[Configuration.verticalWires][Configuration.horizontalWires];
+		histogrammValues = new HistogrammValue[100];
 		
 		for (int vert = 0; vert < Configuration.verticalWires; vert++) {
 			for (int hor = 0; hor < Configuration.horizontalWires; hor++) {
@@ -80,17 +96,32 @@ public class MultiTouchProcessing {
 				frame.revalidate();
 			}
 		}
+		for(int i=0; i<2; i++) {
+			histogrammValues[i] = new HistogrammValue(i,0.7);
+			histoPanel.add(histogrammValues[i]);
+			if(i==0) {
+				histogrammValues[i].setBounds(0, 0, 100, 50);
+			}
+			else {
+				histogrammValues[i].setBounds(200, 70, 50, 10);
+			}
+			System.out.println("i:" + i + "- " + histogrammValues[i].getBounds());
+		}
+		histoPanel.repaint();
+		System.out.println("HistogrammPanel: " + histoPanel.getComponentCount());
 		
 		if (Configuration.realData) {
 			// REAL DATA
 			processRealData();
 		} else {
 			//FAKE DATA
-			processFakeData();
+			//processFakeData();
 		}
 	}
 
 	private void processFakeData() {
+		frameLabel.setText("adding Fakedata for visualization...");
+		
 		GaussianBlur gaus = new GaussianBlur();
 		try {
 			BufferedReader br = new BufferedReader(new FileReader(
@@ -108,6 +139,9 @@ public class MultiTouchProcessing {
 			        crosspoints[i][j].setMeasuredSignalAverage(Double.parseDouble(average[k]));    
 			        double signal = new Double(signalStrength[k]);
 			        crosspoints[i][j].calculateSignalStrength((int)signal);
+			        //Remove border measure values for getting better graphics
+					if(i <= Configuration.removeBorderVal-1 || j <= Configuration.removeBorderVal-1 || i >= Configuration.verticalWires-Configuration.removeBorderVal || j >= Configuration.horizontalWires-Configuration.removeBorderVal)
+						MultiTouchProcessing.crosspoints[i][j].setSignalStrength(0.0);
 			        rects[i][j].setValue(crosspoints[i][j].getSignalStrength());
 			        k++;
 			      }
@@ -127,6 +161,8 @@ public class MultiTouchProcessing {
 				applyBlobDetection(true);
 			}	
 			
+			drawHistogrammValues();
+			
 			frame.validate();
 			frame.repaint();
 			
@@ -144,6 +180,7 @@ public class MultiTouchProcessing {
 	private void processRealData() {
 		GaussianBlur gaus = new GaussianBlur();
 		
+		frameLabel.setText("Open Connection to SerialDevice");
 		serialDevice = new SerialDevice("/dev/tty.usbserial-A4001KsV");
 		if (!serialDevice.openPort()) {
 			return;
@@ -159,10 +196,13 @@ public class MultiTouchProcessing {
 		}
 		
 		int run = 0;
+		frameLabel.setText("Start Calibration");
 		while (!ending) {
 			byte[] data = serialDevice.readData((Configuration.verticalWires * Configuration.horizontalWires * 10 / 8));
 			
 			dataManager.consumeSerialBuffer(data,(run<40),!Configuration.useGauss);
+			if(run == 41) 
+				frameLabel.setText("Device calibrated... You can use it now ;)");
 			if(!(run<40) && Configuration.useGauss)
 				gaus.apply(false);
 			if(!(run<40) && Configuration.useTreshold)
@@ -248,6 +288,24 @@ public class MultiTouchProcessing {
 		      }
 		}
 		//printBinaryData();
+	}
+	
+	public void drawHistogrammValues() {
+		double[] values = new double[100];
+		for(int i=0; i<values.length;i++) {
+			values[i] = 0;
+		}
+		
+		for (int i = 0; i < Configuration.verticalWires; i++) {
+		      for (int j = 0; j < Configuration.horizontalWires; j++) {
+		    	  double signal = crosspoints[i][j].getSignalStrength();
+		    	  int val = (int) (signal * 100);
+		    	  values[val]++;
+		      }
+		}      
+		for(int i=0; i<values.length;i++) {
+			histogrammValues[i].setVal(i/100);
+		}
 	}
 	
 	public void printSignalData() {

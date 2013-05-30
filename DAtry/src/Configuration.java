@@ -3,6 +3,8 @@ public class Configuration {
 	public static int verticalWires = 32;
 	public static int horizontalWires = 22;
 	
+	public static int removeBorderVal = 1; 	//how many measure rows/cols should be removed from the side
+	
 	public static int printoutloop = 1;
 
 	public static int pixelSize = 20;
