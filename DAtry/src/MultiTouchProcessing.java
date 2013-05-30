@@ -70,7 +70,7 @@ public class MultiTouchProcessing {
 		histoPanel.setBounds(0, 500, 300, 100);
 		
 		blobFrame = new JFrame("Data Visualization - Blobs");
-		blobFrame.setPreferredSize(new Dimension(Configuration.verticalWires * Configuration.pixelSize + Configuration.verticalWires * Configuration.pixelSpace + 20, Configuration.horizontalWires * Configuration.pixelSize + Configuration.horizontalWires * Configuration.pixelSpace + 40));
+		blobFrame.setPreferredSize(new Dimension(Configuration.verticalWires * Configuration.pixelSize + Configuration.verticalWires * Configuration.pixelSpace + 20, Configuration.horizontalWires * Configuration.pixelSize + Configuration.horizontalWires * Configuration.pixelSpace + 25));
 		blobFrame.setVisible(true);
 		blobFrame.setLocation(frame.getSize().width,0);
 		
@@ -97,17 +97,13 @@ public class MultiTouchProcessing {
 			}
 		}
 		for(int i=0; i<100; i++) {
-			histogrammValues[i] = new HistogrammValue(i,0.7);
+			histogrammValues[i] = new HistogrammValue(i,0.0);
 			histoPanel.add(histogrammValues[i]);
-			/*if(i==0) {
-				histogrammValues[i].setBounds(0, 0, 100, 50);
-			}
-			else {
-				histogrammValues[i].setBounds(200, 70, 50, 10);
-			}*/
-			System.out.println("i:" + i + "- " + histogrammValues[i].getBounds());
 		}
-		histoPanel.repaint();
+		for(int i=1; i<10; i++) {
+			histoPanel.add(new HistogrammValue((i*10),1.0,true));
+		}
+		histoPanel.revalidate();
 		System.out.println("HistogrammPanel: " + histoPanel.getComponentCount());
 		
 		if (Configuration.realData) {
@@ -115,7 +111,7 @@ public class MultiTouchProcessing {
 			processRealData();
 		} else {
 			//FAKE DATA
-			//processFakeData();
+			processFakeData();
 		}
 	}
 
@@ -213,6 +209,8 @@ public class MultiTouchProcessing {
 				applyBlobDetection(run<=100);
 			}
 			
+			drawHistogrammValues();
+			
 			frame.validate();
 			frame.repaint();
 			
@@ -230,7 +228,10 @@ public class MultiTouchProcessing {
 		int s = 0;
 		for (int i = 0; i < Configuration.horizontalWires; i++) {
 		      for (int j = 0; j < Configuration.verticalWires; j++) {
-		    	  binaryOneDim[s] = binaryData[j][i];
+		    	  if(Configuration.useTreshold)
+		    		  binaryOneDim[s] = binaryData[j][i];
+		    	  else
+		    		  binaryOneDim[s] = crosspoints[j][i].getSignalStrength();
 		    	  s++;
 		      }
 		}      
@@ -293,7 +294,7 @@ public class MultiTouchProcessing {
 	public void drawHistogrammValues() {
 		double[] values = new double[100];
 		for(int i=0; i<values.length;i++) {
-			values[i] = 0;
+			values[i] = 0.0;
 		}
 		
 		for (int i = 0; i < Configuration.verticalWires; i++) {
@@ -303,8 +304,13 @@ public class MultiTouchProcessing {
 		    	  values[val]++;
 		      }
 		}      
-		for(int i=0; i<values.length;i++) {
-			histogrammValues[i].setVal(i/100);
+		for(int i=0;i<values.length;i++){
+			System.out.println("array " + i + " " + values[i]/30);
+		}
+		System.out.println(values);
+		for(int i=1; i<values.length;i++) {
+			histogrammValues[i].setVal(values[i]/20);
+			System.out.println("i:" + i + "- " + histogrammValues[i].getBounds());
 		}
 	}
 	

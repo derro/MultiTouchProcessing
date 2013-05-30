@@ -3,43 +3,36 @@ import java.awt.Color;
 import javax.swing.JPanel;
 
 public class HistogrammValue extends JPanel {
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = 3324681790517352634L;
+	private static final long serialVersionUID = 1L;
+	
 	private int width = 3;
 	private int maxheight = 100;
 	
-	private int x;
+	private final int signalValue;
 	private double val;
 	
-	public int getX() {
-		return x;
-	}
-
-	public void setX(int x) {
-		this.x = x;
-		this.setBounds(x*width,0,width,(int)val*maxheight);
-	}
-
 	public double getVal() {
 		return val;
 	}
 
 	public void setVal(double val) {
 		this.val = val;
-		this.setBounds(x*width,0,width,(int)val*maxheight);
+		this.setBounds(signalValue*width,(100-(int)(val*maxheight)),width,(int)(val*maxheight));
 	}
 
-	public HistogrammValue(int x, double val){
-		this.x = x;
+	public HistogrammValue(int signalValue, double val){
+		this.signalValue = signalValue;
 		this.val = val;
 		
-		this.setBounds(x*width,(100-(int)(val*maxheight)),width,(int)(val*maxheight));
-		if(x%2==0)
-			this.setBackground(new Color(1f, 1f, 1f, 0.3f));
-		else
-			this.setBackground(new Color(0f, 1f, 0f, 0.3f));
-		this.setBorder(javax.swing.BorderFactory.createLineBorder(new Color(0.1f, 1f, 1f, 0.9f)));
+		this.setBounds(signalValue*width,(100-(int)(val*maxheight)),width,(int)(val*maxheight));
+		this.setBackground(new Color(0.1f, 1f, 1f, 0.8f));
+	}
+	
+	public HistogrammValue(int signalValue, double val, boolean helper){
+		this.signalValue = signalValue;
+		this.val = val;
+		
+		this.setBounds(signalValue*width,0,width,100);
+		this.setBackground(new Color(1.0f, 1.0f, 1.0f, 0.4f));
 	}
 }

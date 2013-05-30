@@ -57,7 +57,7 @@ public class BlobFinder {
 				labelBuffer[srcPtr] = 0;
 
 				// Check if on foreground pixel
-				if (srcData[srcPtr] == 1.0)
+				if (srcData[srcPtr] >= Configuration.blobTreshold)
 				{
 					// Find label for neighbours (0 if out of range)
 					int aLabel = (x > 0 && y > 0)		? labelTable[labelBuffer[aPtr]] : 0;
