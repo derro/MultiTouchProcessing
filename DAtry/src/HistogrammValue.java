@@ -36,7 +36,10 @@ public class HistogrammValue extends JPanel {
 		this.val = val;
 		
 		this.setBounds(x*width,(100-(int)(val*maxheight)),width,(int)(val*maxheight));
-		this.setBackground(new Color(1f, 1f, 1f, 0.3f));
+		if(x%2==0)
+			this.setBackground(new Color(1f, 1f, 1f, 0.3f));
+		else
+			this.setBackground(new Color(0f, 1f, 0f, 0.3f));
 		this.setBorder(javax.swing.BorderFactory.createLineBorder(new Color(0.1f, 1f, 1f, 0.9f)));
 	}
 }

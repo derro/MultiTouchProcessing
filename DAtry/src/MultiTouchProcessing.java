@@ -96,15 +96,15 @@ public class MultiTouchProcessing {
 				frame.revalidate();
 			}
 		}
-		for(int i=0; i<2; i++) {
+		for(int i=0; i<100; i++) {
 			histogrammValues[i] = new HistogrammValue(i,0.7);
 			histoPanel.add(histogrammValues[i]);
-			if(i==0) {
+			/*if(i==0) {
 				histogrammValues[i].setBounds(0, 0, 100, 50);
 			}
 			else {
 				histogrammValues[i].setBounds(200, 70, 50, 10);
-			}
+			}*/
 			System.out.println("i:" + i + "- " + histogrammValues[i].getBounds());
 		}
 		histoPanel.repaint();
