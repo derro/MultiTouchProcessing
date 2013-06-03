@@ -17,6 +17,8 @@ public class HistogrammValue extends JPanel {
 
 	public void setVal(double val) {
 		this.val = val;
+		if(val>1.0)
+			val = 1.0;
 		this.setBounds(signalValue*width,(100-(int)(val*maxheight)),width,(int)(val*maxheight));
 	}
 

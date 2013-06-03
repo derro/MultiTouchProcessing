@@ -22,6 +22,7 @@ public class MultiTouchProcessing {
 	public static Crosspoint[][] crosspoints;
 	public static DrawMeasuredData[][] rects;
 	public static HistogrammValue[] histogrammValues;
+	public static boolean triggerMode = false;
 	
 	public SerialDevice serialDevice = null;
 	public DataManager dataManager = null;
@@ -32,7 +33,13 @@ public class MultiTouchProcessing {
 	public JFrame blobFrame;
 	public JPanel blobPanel;
 	public JLabel frameLabel;
+	public JLabel frameFpsLabel;
 	public JPanel histoPanel;
+	public JLabel triggerModeLabel;
+	
+	public int frames, fps;
+	public long lastMillis;
+	public int blobs;
 	
 	public double[][] binaryData = new double[Configuration.verticalWires][Configuration.horizontalWires]; 
 
@@ -60,7 +67,16 @@ public class MultiTouchProcessing {
 		
 		frameLabel = new JLabel("Starting device...");
 		frame.add(frameLabel);
-		frameLabel.setBounds(70, 445, 400, 30);
+		frameLabel.setBounds(70, 450, 400, 20);
+		
+		frameFpsLabel =  new JLabel("fps goes here... ");
+		frame.add(frameFpsLabel);
+		frameFpsLabel.setBounds(120, 470, 40, 20);
+		
+		triggerModeLabel =  new JLabel("off");
+		triggerModeLabel.setForeground(Color.RED);
+		frame.add(triggerModeLabel);
+		triggerModeLabel.setBounds(70, 470, 40, 20);
 		
 		histoPanel = new JPanel();
 		frame.add(histoPanel);
@@ -87,6 +103,10 @@ public class MultiTouchProcessing {
 		crosspoints = new Crosspoint[Configuration.verticalWires][Configuration.horizontalWires];
 		rects = new DrawMeasuredData[Configuration.verticalWires][Configuration.horizontalWires];
 		histogrammValues = new HistogrammValue[100];
+		fps = 0;
+		lastMillis = -1;
+		frames = 0;
+		blobs = 0;
 		
 		for (int vert = 0; vert < Configuration.verticalWires; vert++) {
 			for (int hor = 0; hor < Configuration.horizontalWires; hor++) {
@@ -154,16 +174,13 @@ public class MultiTouchProcessing {
 			}
 			
 			if((Configuration.blobDetection)) {
-				applyBlobDetection(true);
+				applyBlobDetection();
 			}	
 			
 			drawHistogrammValues();
 			
 			frame.validate();
 			frame.repaint();
-			
-			//blobFrame.validate();
-			//blobFrame.repaint();
 			
 			//dataManager.printData(1);
 		} catch (FileNotFoundException e) {
@@ -199,21 +216,29 @@ public class MultiTouchProcessing {
 			dataManager.consumeSerialBuffer(data,(run<40),!Configuration.useGauss);
 			if(run == 41) 
 				frameLabel.setText("Device calibrated... You can use it now ;)");
-			if(!(run<40) && Configuration.useGauss)
-				gaus.apply(false);
-			if(!(run<40) && Configuration.useTreshold)
-				applyTreshold();
-			if(!(run<40) && Configuration.blobDetection) {
-				//printSignalData();
-				//printBinaryData();
-				applyBlobDetection(run<=100);
+			if(!(run<40)) {
+				if(Configuration.useGauss)
+					gaus.apply(!Configuration.useTreshold);
+				if(Configuration.useTreshold)
+					applyTreshold();
+				if(Configuration.blobDetection) {
+					applyBlobDetection();
+					checkTriggerMode();
+					
+				}
+				drawHistogrammValues();
+				frame.validate();
+				frame.repaint();
 			}
 			
-			drawHistogrammValues();
-			
-			frame.validate();
-			frame.repaint();
-			
+			frames++;
+			if(System.currentTimeMillis() - lastMillis > 1000) {
+				lastMillis = System.currentTimeMillis();
+				fps = frames;
+				frames = 0;
+				frameFpsLabel.setText(fps + "fps");
+			}
+				
 			/*
 			if (run % 50 == 0) {
 				dataManager.printData(run);
@@ -223,7 +248,7 @@ public class MultiTouchProcessing {
 		serialDevice.closePort();
 	}
 
-	public void applyBlobDetection(boolean first) {
+	public void applyBlobDetection() {
 		double[] binaryOneDim = new double[Configuration.verticalWires*Configuration.horizontalWires];
 		int s = 0;
 		for (int i = 0; i < Configuration.horizontalWires; i++) {
@@ -253,11 +278,13 @@ public class MultiTouchProcessing {
 		}
 		System.out.println(sb.toString());
 		
+		blobs = blobList.size();
+		
 		//printBinaryDataOneDim(dstData);
-		drawBlobs(blobList, first);
+		drawBlobs(blobList);
 	}
 	
-	public void drawBlobs(ArrayList<Blob> blobList, boolean first) {
+	public void drawBlobs(ArrayList<Blob> blobList) {
 		blobPanel.removeAll();
 
 		for(Blob b : blobList) {
@@ -292,6 +319,7 @@ public class MultiTouchProcessing {
 	}
 	
 	public void drawHistogrammValues() {
+		double max = 0;
 		double[] values = new double[100];
 		for(int i=0; i<values.length;i++) {
 			values[i] = 0.0;
@@ -302,15 +330,15 @@ public class MultiTouchProcessing {
 		    	  double signal = crosspoints[i][j].getSignalStrength();
 		    	  int val = (int) (signal * 100);
 		    	  values[val]++;
+		    	  if(val!=0 && values[val] > max)
+		    		  max = values[val];
 		      }
 		}      
 		for(int i=0;i<values.length;i++){
-			System.out.println("array " + i + " " + values[i]/30);
+			System.out.println("array " + i + " " + values[i]/max);
 		}
-		System.out.println(values);
-		for(int i=1; i<values.length;i++) {
-			histogrammValues[i].setVal(values[i]/20);
-			System.out.println("i:" + i + "- " + histogrammValues[i].getBounds());
+		for(int i=0; i<values.length;i++) {
+			histogrammValues[i].setVal(values[i]/max);
 		}
 	}
 	
@@ -380,5 +408,25 @@ public class MultiTouchProcessing {
 		      bw.newLine();
 		}
 		bw.close();
+	}
+	
+	public void checkTriggerMode() {
+		//TODO check histogramm values
+		if(blobs <= 5)
+			triggerMode = true;
+		else
+			triggerMode = false;
+		updateTriggerMode();
+	}
+	
+	public void updateTriggerMode() {
+		if(triggerMode){
+			triggerModeLabel.setForeground(Color.GREEN);
+			triggerModeLabel.setText("on");
+		}
+		else {
+			triggerModeLabel.setForeground(Color.RED);
+			triggerModeLabel.setText("off");
+		}
 	}
 }
