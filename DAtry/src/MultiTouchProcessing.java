@@ -12,6 +12,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -23,6 +25,7 @@ public class MultiTouchProcessing {
 	public static DrawMeasuredData[][] rects;
 	public static HistogrammValue[] histogrammValues;
 	public static boolean triggerMode = false;
+	public static List<List<Blob>> activeBlobs;
 	
 	public SerialDevice serialDevice = null;
 	public DataManager dataManager = null;
@@ -39,7 +42,8 @@ public class MultiTouchProcessing {
 	
 	public int frames, fps;
 	public long lastMillis;
-	public int blobs;
+	public int blobCount;
+	public long lastBlobId;
 	
 	public double[][] binaryData = new double[Configuration.verticalWires][Configuration.horizontalWires]; 
 
@@ -103,10 +107,13 @@ public class MultiTouchProcessing {
 		crosspoints = new Crosspoint[Configuration.verticalWires][Configuration.horizontalWires];
 		rects = new DrawMeasuredData[Configuration.verticalWires][Configuration.horizontalWires];
 		histogrammValues = new HistogrammValue[100];
+		activeBlobs = new ArrayList<List<Blob>>();
+		
 		fps = 0;
 		lastMillis = -1;
 		frames = 0;
-		blobs = 0;
+		blobCount = 0;
+		lastBlobId = 1;
 		
 		for (int vert = 0; vert < Configuration.verticalWires; vert++) {
 			for (int hor = 0; hor < Configuration.horizontalWires; hor++) {
@@ -124,7 +131,6 @@ public class MultiTouchProcessing {
 			histoPanel.add(new HistogrammValue((i*10),1.0,true));
 		}
 		histoPanel.revalidate();
-		System.out.println("HistogrammPanel: " + histoPanel.getComponentCount());
 		
 		if (Configuration.realData) {
 			// REAL DATA
@@ -224,7 +230,6 @@ public class MultiTouchProcessing {
 				if(Configuration.blobDetection) {
 					applyBlobDetection();
 					checkTriggerMode();
-					
 				}
 				drawHistogrammValues();
 				frame.validate();
@@ -238,61 +243,23 @@ public class MultiTouchProcessing {
 				frames = 0;
 				frameFpsLabel.setText(fps + "fps");
 			}
-				
+			
 			/*
 			if (run % 50 == 0) {
 				dataManager.printData(run);
 			}*/
 			run++; 
 		}
+		if(activeBlobs.size() == 1) {
+			drawBlobPath(activeBlobs.get(0));
+		}
+			
 		serialDevice.closePort();
 	}
 
-	public void applyBlobDetection() {
-		double[] binaryOneDim = new double[Configuration.verticalWires*Configuration.horizontalWires];
-		int s = 0;
-		for (int i = 0; i < Configuration.horizontalWires; i++) {
-		      for (int j = 0; j < Configuration.verticalWires; j++) {
-		    	  if(Configuration.useTreshold)
-		    		  binaryOneDim[s] = binaryData[j][i];
-		    	  else
-		    		  binaryOneDim[s] = crosspoints[j][i].getSignalStrength();
-		    	  s++;
-		      }
-		}      
-		
-		// Create Blob Finder
-		BlobFinder finder = new BlobFinder(Configuration.verticalWires, Configuration.horizontalWires);
-		double[] dstData = new double[binaryOneDim.length];
-		ArrayList<Blob> blobList = new ArrayList<Blob>();
-		finder.detectBlobs(binaryOneDim, dstData, 0, -1, blobList);
-
-		// List Blobs
-		System.out.printf("Found %d blobs:\n", blobList.size());
-		System.out.printf("=================\n");
-		int i=1;
-		StringBuilder sb = new StringBuilder();
-		for(Blob blob: blobList) {
-			sb.append("blob nr."+i+" with "+blob.mass+" points.\n");
-			i++;
-		}
-		System.out.println(sb.toString());
-		
-		blobs = blobList.size();
-		
-		//printBinaryDataOneDim(dstData);
-		drawBlobs(blobList);
-	}
-	
-	public void drawBlobs(ArrayList<Blob> blobList) {
-		blobPanel.removeAll();
-
-		for(Blob b : blobList) {
-			blobPanel.add(b);
-		}
-		blobPanel.validate();
-		blobPanel.repaint();
-	}
+	/**********************
+	 * TRESHHOLD FUNCTIONS
+	 **********************/
 	
 	public void applyTreshold() {
 		for (int i = 0; i < Configuration.verticalWires; i++) {
@@ -318,6 +285,177 @@ public class MultiTouchProcessing {
 		//printBinaryData();
 	}
 	
+	/**********************
+	 * BLOB FUNCTIONS
+	 **********************/
+
+	public void applyBlobDetection() {
+		double[] binaryOneDim = new double[Configuration.verticalWires*Configuration.horizontalWires];
+		int s = 0;
+		for (int i = 0; i < Configuration.horizontalWires; i++) {
+		      for (int j = 0; j < Configuration.verticalWires; j++) {
+		    	  if(Configuration.useTreshold)
+		    		  binaryOneDim[s] = binaryData[j][i];
+		    	  else
+		    		  binaryOneDim[s] = crosspoints[j][i].getSignalStrength();
+		    	  s++;
+		      }
+		}      
+		
+		// Create Blob Finder
+		long millis = System.currentTimeMillis();								//Timestamp for BlobCreation
+		BlobFinder finder = new BlobFinder(Configuration.verticalWires, Configuration.horizontalWires, millis);
+		double[] dstData = new double[binaryOneDim.length];
+		ArrayList<Blob> blobList = new ArrayList<Blob>();
+
+		// Detect Blobs
+		lastBlobId = finder.detectBlobs(binaryOneDim, dstData, 0, -1, blobList, lastBlobId);
+		blobCount = blobList.size();
+		
+		// Calculate Movement of Blobs
+		checkMovements(blobList);
+		
+		// Draw Blobs
+		drawBlobs(blobList);
+		
+		
+		// List Blobs
+		/*
+		System.out.printf("Found %d blobs:\n", blobList.size());
+		System.out.printf("=================\n");
+		int i=1;
+		StringBuilder sb = new StringBuilder();
+		for(Blob blob: blobList) {
+			sb.append("blob nr."+i+" with "+blob.mass+" points.\n");
+			i++;
+		}
+		System.out.println(sb.toString());
+		*/
+	}
+	
+	private void checkMovements(ArrayList<Blob> blobList) {
+		//Print out all blobs
+		System.out.println("\n \n=== NEW BLOB ROUND ===");
+		for(Blob b : blobList)
+			System.out.println(b);
+		System.out.println("=== Calculation starts now ===");
+		
+		//nothing in activeBlobList -> add all of them
+		if(activeBlobs.size() == 0) {
+			System.out.println("active blob size was " + activeBlobs.size() +" -> (1)");
+			//Add each new blob in a new list tot the active blobs (for history)
+			for(Blob b : blobList) {
+				ArrayList<Blob> sbl = new ArrayList<Blob>();		//sbl: single blob list
+				sbl.add(b);
+				activeBlobs.add(sbl);
+			}
+		} else {
+			System.out.println("active blob size was " + activeBlobs.size() +" -> (2)");
+			for(Blob nb : blobList) {
+				boolean found = false;
+				for(List<Blob> sbl : activeBlobs) {
+					Blob ob = sbl.get(sbl.size()-1);
+					//System.out.println("Checking following blobs: \n > " + ob + " \n >" + nb + "\n");
+					if( isInRange(nb.getxMiddle(), ob.getxMiddle(), Configuration.blobRangeRadius) &&
+						isInRange(nb.getyMiddle(), ob.getyMiddle(), Configuration.blobRangeRadius)){
+						System.out.println("found matching blob: \n >>" + ob + "\n >>" + nb + " \n -> (3)");
+						//Blob seems to be the same -> add to list
+						nb.setId(ob.getId());
+						sbl.add(nb);
+						found = true;
+					}
+				}
+				if(!found) {
+					//seems to be a new blob -> add a new list to active blob list
+					System.out.println("no matching blob -> (4)");
+					ArrayList<Blob> sbl = new ArrayList<Blob>();		//sbl: single blob list
+					sbl.add(nb);
+					activeBlobs.add(sbl);
+				}
+			}
+			
+			List<List<Blob>> toRemove = new ArrayList<List<Blob>>();
+			
+			//Check if there are some old blobs -> if yes delete them
+			for(List<Blob> sbl : activeBlobs) {
+				Blob ob = sbl.get(sbl.size()-1);
+				if(ob.getCreatedAt() < System.currentTimeMillis()-500){
+					System.out.println("found blob to delete -> (5)");
+					toRemove.add(sbl);
+				}
+			}
+			activeBlobs.removeAll(toRemove);
+			
+			System.out.println("ACTIVE BLOBS: " + activeBlobs.size());
+			for(List<Blob> sbl : activeBlobs) {
+				Blob b = sbl.get(sbl.size()-1);
+				System.out.println("blob with id: " + b.getId() + " has " + sbl.size() + " pathitems stored");
+			}
+			
+		}
+	}
+	
+	private boolean isInRange(double a, double b, double maxrange) {
+		double dif = (a-b);
+		if(dif < 0.0)
+			dif *= -1;
+		
+		return dif <= maxrange;
+	}
+	
+	public void drawBlobs(List<Blob> blobList) {
+		blobPanel.removeAll();
+
+		for(Blob b : blobList) {
+			blobPanel.add(b);
+		}
+		blobPanel.validate();
+		blobPanel.repaint();
+	}
+	
+	public void drawBlobPath(List<Blob> blobList) {
+		blobPanel.removeAll();
+
+		Iterator<Blob> iter = blobList.iterator();
+		while(iter.hasNext()) {
+			Blob b = iter.next();
+			b.setBackground(new Color(0f, 1f, 1f, 0.1f));
+			if(!iter.hasNext())
+				b.setBackground(new Color(1f, 1f, 1f, 0.3f));
+			blobPanel.add(b);
+		}
+		blobPanel.validate();
+		blobPanel.repaint();
+	}
+	
+	/**********************
+	 * TRIGGERMODE FUNCTIONS
+	 **********************/
+	
+	public void checkTriggerMode() {
+		//TODO check histogramm values
+		if(blobCount <= 5)
+			triggerMode = true;
+		else
+			triggerMode = false;
+		updateTriggerMode();
+	}
+	
+	public void updateTriggerMode() {
+		if(triggerMode){
+			triggerModeLabel.setForeground(Color.GREEN);
+			triggerModeLabel.setText("on");
+		}
+		else {
+			triggerModeLabel.setForeground(Color.RED);
+			triggerModeLabel.setText("off");
+		}
+	}
+	
+	/**********************
+	 * HISTOGRAMM FUNCTIONS
+	 **********************/
+	
 	public void drawHistogrammValues() {
 		double max = 0;
 		double[] values = new double[100];
@@ -334,13 +472,18 @@ public class MultiTouchProcessing {
 		    		  max = values[val];
 		      }
 		}      
+		/*
 		for(int i=0;i<values.length;i++){
 			System.out.println("array " + i + " " + values[i]/max);
-		}
+		}*/
 		for(int i=0; i<values.length;i++) {
 			histogrammValues[i].setVal(values[i]/max);
 		}
 	}
+	
+	/**********************
+	 * PRINT FUNCTIONS
+	 **********************/
 	
 	public void printSignalData() {
 		StringBuilder sb = new StringBuilder();
@@ -408,25 +551,5 @@ public class MultiTouchProcessing {
 		      bw.newLine();
 		}
 		bw.close();
-	}
-	
-	public void checkTriggerMode() {
-		//TODO check histogramm values
-		if(blobs <= 5)
-			triggerMode = true;
-		else
-			triggerMode = false;
-		updateTriggerMode();
-	}
-	
-	public void updateTriggerMode() {
-		if(triggerMode){
-			triggerModeLabel.setForeground(Color.GREEN);
-			triggerModeLabel.setText("on");
-		}
-		else {
-			triggerModeLabel.setForeground(Color.RED);
-			triggerModeLabel.setText("off");
-		}
 	}
 }

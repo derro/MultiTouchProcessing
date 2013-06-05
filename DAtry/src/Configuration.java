@@ -11,7 +11,7 @@ public class Configuration {
 	public static int pixelSpace = 0;
 	
 	public static double cutoff = 0.4;
-	public static boolean realData = true;
+	public static boolean realData = false;
 	
 	public static double tresholdMiddle = 0.3;
 	public static double tresholdTop = 0.5;
@@ -23,4 +23,6 @@ public class Configuration {
 	
 	public static boolean blobDetection = true;
 	public static double blobTreshold = 0.5;
+	
+	public static double blobRangeRadius = 2;
 }

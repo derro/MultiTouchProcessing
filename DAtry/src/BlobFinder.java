@@ -14,11 +14,14 @@ public class BlobFinder {
 	private int[] yMinTable;
 	private int[] yMaxTable;
 	private int[] massTable;
+	
+	private long millis;
 
-	public BlobFinder(int width, int height)
+	public BlobFinder(int width, int height, long millis)
 	{
 		this.width = width;
 		this.height = height;
+		this.millis = millis;
 
 		labelBuffer = new int[width * height];
 
@@ -35,7 +38,7 @@ public class BlobFinder {
 		massTable = new int[tableSize];
 	}
 	
-	public List<Blob> detectBlobs(double[] srcData, double[] dstData, int minBlobMass, int maxBlobMass, List<Blob> blobList)
+	public long detectBlobs(double[] srcData, double[] dstData, int minBlobMass, int maxBlobMass, List<Blob> blobList, long lastBlobId)
 	{
 		// This is the neighbouring pixel pattern. For position X, A, B, C & D are checked
 		// A B C
@@ -142,7 +145,7 @@ public class BlobFinder {
 
 				if (massTable[i] >= minBlobMass && (massTable[i] <= maxBlobMass || maxBlobMass == -1))
 				{
-					Blob blob = new Blob(xMinTable[i], xMaxTable[i], yMinTable[i], yMaxTable[i], massTable[i]);
+					Blob blob = new Blob(lastBlobId++, xMinTable[i], xMaxTable[i], yMinTable[i], yMaxTable[i], massTable[i], millis);
 					blob.setId(labelTable[i]);
 					blobList.add(blob);
 				}
@@ -189,6 +192,6 @@ public class BlobFinder {
 			}
 		}
 
-		return blobList;
+		return lastBlobId;
 	}
 }
