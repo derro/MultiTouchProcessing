@@ -26,4 +26,10 @@ public class Configuration {
 	public static double blobTreshold = 0.5;
 	
 	public static double blobRangeRadius = 2;
+	
+	public static int pixelSizeInterpolation = 7;
+	public static int pixelSpaceInterpolation = 0;
+	
+	public static boolean applyInterpolator = true;
+	public static int interpolatorResolution = 3;
 }

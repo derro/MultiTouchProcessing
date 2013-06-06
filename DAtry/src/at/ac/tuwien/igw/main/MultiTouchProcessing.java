@@ -25,6 +25,8 @@ import at.ac.tuwien.igw.blob.Blob;
 import at.ac.tuwien.igw.blob.BlobFinder;
 import at.ac.tuwien.igw.config.Configuration;
 import at.ac.tuwien.igw.filtering.GaussianBlur;
+import at.ac.tuwien.igw.interpolator.Cubic;
+import at.ac.tuwien.igw.interpolator.Interpolator;
 import at.ac.tuwien.igw.objects.Crosspoint;
 import at.ac.tuwien.igw.objects.swing.DrawMeasuredData;
 import at.ac.tuwien.igw.objects.swing.HistogrammValue;
@@ -34,12 +36,15 @@ import at.ac.tuwien.igw.serial.SerialDevice;
 public class MultiTouchProcessing {
 	public static Crosspoint[][] crosspoints;
 	public static DrawMeasuredData[][] rects;
+	public static DrawMeasuredData[][] rectsInterpolation;
+	public static double[] interpolPixels;
 	public static HistogrammValue[] histogrammValues;
 	public static boolean triggerMode = false;
 	public static List<List<Blob>> activeBlobs;
 	
 	public SerialDevice serialDevice = null;
 	public DataManager dataManager = null;
+	public Interpolator interpolator = null;
 
 	public boolean ending = false;
 	
@@ -78,27 +83,27 @@ public class MultiTouchProcessing {
 			}
 		};
 		b.addActionListener(al);
-		b.setBounds(20, 450, 40,20);
+		b.setBounds(20, 470, 40,20);
 		
 		frameLabel = new JLabel("Starting device...");
 		frame.add(frameLabel);
-		frameLabel.setBounds(70, 450, 400, 20);
+		frameLabel.setBounds(70, 470, 400, 20);
 		
 		frameFpsLabel =  new JLabel("fps goes here... ");
 		frame.add(frameFpsLabel);
-		frameFpsLabel.setBounds(120, 470, 40, 20);
+		frameFpsLabel.setBounds(120, 490, 40, 20);
 		
 		triggerModeLabel =  new JLabel("off");
 		triggerModeLabel.setForeground(Color.RED);
 		frame.add(triggerModeLabel);
-		triggerModeLabel.setBounds(70, 470, 40, 20);
+		triggerModeLabel.setBounds(70, 490, 40, 20);
 		
 		histoPanel = new JPanel();
 		frame.add(histoPanel);
 		histoPanel.setBackground(Color.DARK_GRAY);
 		histoPanel.setLayout(null);
 		histoPanel.setSize(300,100);
-		histoPanel.setBounds(0, 500, 300, 100);
+		histoPanel.setBounds(0, 520, 300, 100);
 		
 		blobFrame = new JFrame("Data Visualization - Blobs");
 		blobFrame.setPreferredSize(new Dimension(Configuration.verticalWires * Configuration.pixelSize + Configuration.verticalWires * Configuration.pixelSpace + 20, Configuration.horizontalWires * Configuration.pixelSize + Configuration.horizontalWires * Configuration.pixelSpace + 25));
@@ -120,6 +125,18 @@ public class MultiTouchProcessing {
 		histogrammValues = new HistogrammValue[100];
 		activeBlobs = new ArrayList<List<Blob>>();
 		
+		if(Configuration.applyInterpolator) {
+			interpolator = new Cubic(Configuration.verticalWires, Configuration.horizontalWires, Configuration.interpolatorResolution, Configuration.interpolatorResolution);
+			interpolPixels = new double[interpolator.getPixelWidth() * interpolator.getPixelHeight()];
+			rectsInterpolation =  new DrawMeasuredData[interpolator.getPixelWidth()][interpolator.getPixelHeight()];
+			for (int vert = 0; vert < interpolator.getPixelWidth(); vert++) {
+				for (int hor = 0; hor < interpolator.getPixelHeight(); hor++) {
+					rectsInterpolation[vert][hor] = new DrawMeasuredData(vert * Configuration.pixelSizeInterpolation, hor * Configuration.pixelSizeInterpolation, Configuration.pixelSizeInterpolation, Configuration.pixelSizeInterpolation, 0);
+					frame.add(rectsInterpolation[vert][hor]);
+					frame.revalidate();
+				}
+			}
+		}
 		fps = 0;
 		lastMillis = -1;
 		frames = 0;
@@ -130,8 +147,10 @@ public class MultiTouchProcessing {
 			for (int hor = 0; hor < Configuration.horizontalWires; hor++) {
 				crosspoints[vert][hor] = new Crosspoint(vert, hor);
 				rects[vert][hor] = new DrawMeasuredData(vert * Configuration.pixelSize, hor * Configuration.pixelSize, Configuration.pixelSize, Configuration.pixelSize, 0);
-				frame.add(rects[vert][hor]);
-				frame.revalidate();
+				if(!Configuration.applyInterpolator) {
+					frame.add(rects[vert][hor]);
+					frame.revalidate();
+				}
 			}
 		}
 		for(int i=0; i<100; i++) {
@@ -183,6 +202,19 @@ public class MultiTouchProcessing {
 			br.close();
 			if(Configuration.useGauss)
 				gaus.apply(true);
+			
+			if(Configuration.applyInterpolator) {
+				interpolator.interpolate(crosspoints);
+				interpolPixels = interpolator.getInterpolPixels();
+				
+				System.out.println("size of interpol values: " + interpolator.getInterpolPixels().length);
+				//printBinaryDataOneDim(interpolPixels, interpolator.getPixelWidth());
+				for (int x = 0; x < interpolator.getPixelWidth(); x++) {
+					for (int y = 0; y <  interpolator.getPixelHeight(); y++) {
+						rectsInterpolation[x][y].setValue(interpolPixels[y*(interpolator.getPixelWidth())+x]);
+					}
+				}
+			}
 			
 			if((Configuration.useTreshold)) {
 				printSignalData();
@@ -236,6 +268,18 @@ public class MultiTouchProcessing {
 			if(!(run<40)) {
 				if(Configuration.useGauss)
 					gaus.apply(!Configuration.useTreshold);
+				if(Configuration.applyInterpolator) {
+					interpolator.interpolate(crosspoints);
+					interpolPixels = interpolator.getInterpolPixels();
+					
+					System.out.println("size of interpol values: " + interpolator.getInterpolPixels().length);
+					//printBinaryDataOneDim(interpolPixels, interpolator.getPixelWidth());
+					for (int x = 0; x < interpolator.getPixelWidth(); x++) {
+						for (int y = 0; y <  interpolator.getPixelHeight(); y++) {
+							rectsInterpolation[x][y].setValue(interpolPixels[y*(interpolator.getPixelWidth())+x]);
+						}
+					}
+				}
 				if(Configuration.useTreshold)
 					applyTreshold();
 				if(Configuration.blobDetection) {
@@ -247,6 +291,7 @@ public class MultiTouchProcessing {
 				frame.repaint();
 			}
 			
+			//Calculating Frames
 			frames++;
 			if(System.currentTimeMillis() - lastMillis > 1000) {
 				lastMillis = System.currentTimeMillis();
@@ -254,17 +299,13 @@ public class MultiTouchProcessing {
 				frames = 0;
 				frameFpsLabel.setText(fps + "fps");
 			}
-			
-			/*
-			if (run % 50 == 0) {
-				dataManager.printData(run);
-			}*/
 			run++; 
 		}
+		//Draw Blob Path
 		if(activeBlobs.size() == 1) {
 			drawBlobPath(activeBlobs.get(0));
 		}
-			
+		
 		serialDevice.closePort();
 	}
 
@@ -527,7 +568,7 @@ public class MultiTouchProcessing {
 		System.out.println(sb.toString());
 	}
 	
-	public void printBinaryDataOneDim(double array[]) {
+	public void printBinaryDataOneDim(double array[], int linebreak) {
 		StringBuilder sb = new StringBuilder();
 		int i = 1;
 		for(double d : array) {
@@ -536,7 +577,7 @@ public class MultiTouchProcessing {
 				sb.append("___");
 			else
 				sb.append(d);
-			if(i % Configuration.verticalWires == 0)
+			if(i % linebreak == 0)
 				sb.append("\n");
 			i++;
 		}
