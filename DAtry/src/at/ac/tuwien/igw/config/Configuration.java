@@ -1,35 +1,38 @@
 package at.ac.tuwien.igw.config;
 
 public class Configuration {
-	public static int verticalWires = 32;
-	public static int horizontalWires = 22;
+	// General settings
+	public static int verticalWires = 32;			// count of vertical wires
+	public static int horizontalWires = 22;			// count of horizontal wires
 	
-	public static int removeBorderVal = 1; 	//how many measure rows/cols should be removed from the side
+	// Advanced settings
+	public static int removeBorderVal = 1; 			// how many measure rows/cols should be removed from the side (disruption values)
+	public static double cutoff = 0.4;				// value for signal processing (Schwankungsbereich)
+	public static boolean realData = true;			// is the device connected?
 	
-	public static int printoutloop = 1;
+	// Layout settings
+	public static int pixelSize = 20;				// size of pixel to display if interpolation is disabled 
+	public static int pixelSpace = 0;				// space between pixels if interpolation is disabled
+	
+	// Treshold Settings							// set values to two defined areas: 1.0 and 0.5
+	public static boolean useTreshold = false;		// activate/disable treshold
+	public static double tresholdMiddle = 0.3;		// treshold for 0.5
+	public static double tresholdTop = 0.5;			// treshold for 1.0
 
-	public static int pixelSize = 20;
-	public static int pixelSpace = 0;
+	// Gauss Settings
+	public static boolean useGauss = false;			// enable/disable gauss filtering
+	public static double sigma = 0.4;				// sigma to calculate gauss
+	public static int kernelsize = 3;				// kernelsize
 	
-	public static double cutoff = 0.4;
-	public static boolean realData = false;
+	// Blob Settings
+	public static boolean blobDetection = true;		// enable/disable blob detection
+	public static double blobTreshold = 0.5;		// treshold for counting to a blob
+	public static double blobRangeRadius = 2;		// how far can a blob move in one measure-loop
 	
-	public static double tresholdMiddle = 0.3;
-	public static double tresholdTop = 0.5;
-	public static boolean useTreshold = false;
-
-	public static boolean useGauss = true;
-	public static double sigma = 0.5;
-	public static int kernelsize = 3;
+	// Interpolation Settings
+	public static boolean applyInterpolator = true;	// enable/disable interpolation
+	public static int interpolatorResolution = 3;	// resolution of interpolation. e.g. 3 - calculates 3 pixel out of every original pixel
+	public static int pixelSizeInterpolation = 7;	// size of pixel to display
+	public static int pixelSpaceInterpolation = 0;	// space of pixel
 	
-	public static boolean blobDetection = true;
-	public static double blobTreshold = 0.5;
-	
-	public static double blobRangeRadius = 2;
-	
-	public static int pixelSizeInterpolation = 7;
-	public static int pixelSpaceInterpolation = 0;
-	
-	public static boolean applyInterpolator = true;
-	public static int interpolatorResolution = 3;
 }

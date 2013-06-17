@@ -25,6 +25,7 @@ import at.ac.tuwien.igw.blob.Blob;
 import at.ac.tuwien.igw.blob.BlobFinder;
 import at.ac.tuwien.igw.config.Configuration;
 import at.ac.tuwien.igw.filtering.GaussianBlur;
+import at.ac.tuwien.igw.interpolator.Catmullrom;
 import at.ac.tuwien.igw.interpolator.Cubic;
 import at.ac.tuwien.igw.interpolator.Interpolator;
 import at.ac.tuwien.igw.objects.Crosspoint;
@@ -126,7 +127,8 @@ public class MultiTouchProcessing {
 		activeBlobs = new ArrayList<List<Blob>>();
 		
 		if(Configuration.applyInterpolator) {
-			interpolator = new Cubic(Configuration.verticalWires, Configuration.horizontalWires, Configuration.interpolatorResolution, Configuration.interpolatorResolution);
+			interpolator = new Catmullrom(Configuration.verticalWires, Configuration.horizontalWires, Configuration.interpolatorResolution, Configuration.interpolatorResolution);
+			//interpolator = new Cubic(Configuration.verticalWires, Configuration.horizontalWires, Configuration.interpolatorResolution, Configuration.interpolatorResolution);
 			interpolPixels = new double[interpolator.getPixelWidth() * interpolator.getPixelHeight()];
 			rectsInterpolation =  new DrawMeasuredData[interpolator.getPixelWidth()][interpolator.getPixelHeight()];
 			for (int vert = 0; vert < interpolator.getPixelWidth(); vert++) {
