@@ -13,18 +13,25 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.text.DefaultCaret;
 
 import at.ac.tuwien.igw.blob.Blob;
 import at.ac.tuwien.igw.blob.BlobFinder;
 import at.ac.tuwien.igw.config.Configuration;
+import at.ac.tuwien.igw.config.Configuration.InterpolatorType;
 import at.ac.tuwien.igw.filtering.GaussianBlur;
+import at.ac.tuwien.igw.gestures.BasicGesture;
 import at.ac.tuwien.igw.interpolator.Catmullrom;
 import at.ac.tuwien.igw.interpolator.Cubic;
 import at.ac.tuwien.igw.interpolator.Interpolator;
@@ -33,6 +40,9 @@ import at.ac.tuwien.igw.objects.swing.DrawMeasuredData;
 import at.ac.tuwien.igw.objects.swing.HistogrammValue;
 import at.ac.tuwien.igw.serial.DataManager;
 import at.ac.tuwien.igw.serial.SerialDevice;
+import at.ac.tuwien.igw.state.State;
+import at.ac.tuwien.igw.types.BasicGestureType;
+import at.ac.tuwien.igw.types.Movements;
 
 public class MultiTouchProcessing {
 	public static Crosspoint[][] crosspoints;
@@ -42,6 +52,9 @@ public class MultiTouchProcessing {
 	public static HistogrammValue[] histogrammValues;
 	public static boolean triggerMode = false;
 	public static List<List<Blob>> activeBlobs;
+	public static List<BasicGesture> activeBasicGestures;
+	public static List<BasicGesture> historyBasicGestures;
+	public static State activeState;
 	
 	public SerialDevice serialDevice = null;
 	public DataManager dataManager = null;
@@ -51,16 +64,20 @@ public class MultiTouchProcessing {
 	
 	public JFrame frame;
 	public JFrame blobFrame;
+	public JFrame infoFrame;
 	public JPanel blobPanel;
+	public JPanel infoPanel;
 	public JLabel frameLabel;
 	public JLabel frameFpsLabel;
 	public JPanel histoPanel;
 	public JLabel triggerModeLabel;
+	public JTextArea infoTextArea;
 	
 	public int frames, fps;
 	public long lastMillis;
 	public int blobCount;
 	public long lastBlobId;
+	public long lastGestureId;
 	
 	public double[][] binaryData = new double[Configuration.verticalWires][Configuration.horizontalWires]; 
 
@@ -117,7 +134,23 @@ public class MultiTouchProcessing {
 		blobPanel.setSize(Configuration.verticalWires * Configuration.pixelSize + Configuration.verticalWires * Configuration.pixelSpace + 20, Configuration.horizontalWires * Configuration.pixelSize + Configuration.horizontalWires * Configuration.pixelSpace + 40);
 		blobFrame.add(blobPanel, BorderLayout.CENTER);
 		
+		infoFrame = new JFrame("Data Visualization - Information");
+		infoFrame.setPreferredSize(new Dimension(Configuration.verticalWires * Configuration.pixelSize + Configuration.verticalWires * Configuration.pixelSpace + 20, 250));
+		infoFrame.setVisible(true);
+		infoFrame.setLocation(frame.getSize().width,Configuration.horizontalWires * Configuration.pixelSize + Configuration.horizontalWires * Configuration.pixelSpace + 45);
+		
+		infoTextArea = new JTextArea(10, 20);
+		JScrollPane scrollPane = new JScrollPane(infoTextArea);
+		scrollPane.setPreferredSize(new Dimension(infoFrame.getWidth(), infoFrame.getHeight()));
+		DefaultCaret caret = (DefaultCaret)infoTextArea.getCaret();
+		caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
+		infoTextArea.setEditable(false);
+		infoFrame.add(scrollPane, BorderLayout.CENTER);
+		
+		printLog("Starting device...");
+		
 		blobFrame.pack();
+		infoFrame.pack();
 
 		// INITIALIZATION
 		dataManager = new DataManager();
@@ -125,10 +158,15 @@ public class MultiTouchProcessing {
 		rects = new DrawMeasuredData[Configuration.verticalWires][Configuration.horizontalWires];
 		histogrammValues = new HistogrammValue[100];
 		activeBlobs = new ArrayList<List<Blob>>();
+		activeBasicGestures = new ArrayList<BasicGesture>();
+		historyBasicGestures = new ArrayList<BasicGesture>();
 		
 		if(Configuration.applyInterpolator) {
-			interpolator = new Catmullrom(Configuration.verticalWires, Configuration.horizontalWires, Configuration.interpolatorResolution, Configuration.interpolatorResolution);
-			//interpolator = new Cubic(Configuration.verticalWires, Configuration.horizontalWires, Configuration.interpolatorResolution, Configuration.interpolatorResolution);
+			if(Configuration.interpolatorUsed == InterpolatorType.CUBIC)
+				interpolator = new Cubic(Configuration.verticalWires, Configuration.horizontalWires, Configuration.interpolatorResolution, Configuration.interpolatorResolution);
+			if(Configuration.interpolatorUsed == InterpolatorType.CATMULLROM)	
+				interpolator = new Catmullrom(Configuration.verticalWires, Configuration.horizontalWires, Configuration.interpolatorResolution, Configuration.interpolatorResolution);
+			
 			interpolPixels = new double[interpolator.getPixelWidth() * interpolator.getPixelHeight()];
 			rectsInterpolation =  new DrawMeasuredData[interpolator.getPixelWidth()][interpolator.getPixelHeight()];
 			for (int vert = 0; vert < interpolator.getPixelWidth(); vert++) {
@@ -144,6 +182,28 @@ public class MultiTouchProcessing {
 		frames = 0;
 		blobCount = 0;
 		lastBlobId = 1;
+		lastGestureId = 1;
+		
+		// CREATE AND SET STATES IN MAP
+		Map<String, State> states = new HashMap<String, State>();
+		State start = new State("start", "Start", null, null);
+		states.put(start.getId(), start);
+		State help = new State("help", "Help", start, null);
+		states.put(help.getId(), help);
+		State silence = new State("silence", "Silence", start, null);
+		states.put(silence.getId(), silence);
+		State settings = new State("settings", "Settings", start, null);
+		states.put(settings.getId(), settings);
+		State location = new State("location", "Location", silence, null);
+		states.put(location.getId(), location);
+		State layer = new State("layer", "Layer", silence, null);
+		states.put(layer.getId(), layer);
+		State customLocation = new State("customLocation", "Custom Location", silence, null);
+		states.put(customLocation.getId(), customLocation);
+		State distance = new State("distance", "Distance", silence, null);
+		states.put(distance.getId(), distance);
+		activeState = start;
+		printLog(activeState.toString());
 		
 		for (int vert = 0; vert < Configuration.verticalWires; vert++) {
 			for (int hor = 0; hor < Configuration.horizontalWires; hor++) {
@@ -164,6 +224,9 @@ public class MultiTouchProcessing {
 		}
 		histoPanel.revalidate();
 		
+		activeState = states.get("silence");
+		printLog(activeState.toString());
+		
 		if (Configuration.realData) {
 			// REAL DATA
 			processRealData();
@@ -178,8 +241,7 @@ public class MultiTouchProcessing {
 		
 		GaussianBlur gaus = new GaussianBlur();
 		try {
-			BufferedReader br = new BufferedReader(new FileReader(
-					"fakehand.txt"));
+			BufferedReader br = new BufferedReader(new FileReader("fakehand.txt"));
 
 			String msr = br.readLine();
 			String avg = br.readLine();
@@ -225,7 +287,10 @@ public class MultiTouchProcessing {
 			}
 			
 			if((Configuration.blobDetection)) {
-				applyBlobDetection();
+				if(Configuration.applyInterpolator) 
+					applyBlobDetectionWithInterpolData();
+				else
+					applyBlobDetection();
 			}	
 			
 			drawHistogrammValues();
@@ -284,10 +349,14 @@ public class MultiTouchProcessing {
 				}
 				if(Configuration.useTreshold)
 					applyTreshold();
-				if(Configuration.blobDetection) {
-					applyBlobDetection();
+				if((Configuration.blobDetection)) {
+					if(Configuration.applyInterpolator) 
+						applyBlobDetectionWithInterpolData();
+					else
+						applyBlobDetection();
+					
 					checkTriggerMode();
-				}
+				}	
 				drawHistogrammValues();
 				frame.validate();
 				frame.repaint();
@@ -346,8 +415,8 @@ public class MultiTouchProcessing {
 	public void applyBlobDetection() {
 		double[] binaryOneDim = new double[Configuration.verticalWires*Configuration.horizontalWires];
 		int s = 0;
-		for (int i = 0; i < Configuration.horizontalWires; i++) {
-		      for (int j = 0; j < Configuration.verticalWires; j++) {
+		for (int i = 0; i < Configuration.horizontalWires; i++) { //22
+		      for (int j = 0; j < Configuration.verticalWires; j++) { //32
 		    	  if(Configuration.useTreshold)
 		    		  binaryOneDim[s] = binaryData[j][i];
 		    	  else
@@ -363,11 +432,8 @@ public class MultiTouchProcessing {
 		ArrayList<Blob> blobList = new ArrayList<Blob>();
 
 		// Detect Blobs
-		lastBlobId = finder.detectBlobs(binaryOneDim, dstData, 0, -1, blobList, lastBlobId);
+		lastBlobId = finder.detectBlobs(binaryOneDim, dstData, Configuration.minBlobMass, -1, blobList, lastBlobId);
 		blobCount = blobList.size();
-		
-		// Calculate Movement of Blobs
-		checkMovements(blobList);
 		
 		// Draw Blobs
 		drawBlobs(blobList);
@@ -385,70 +451,175 @@ public class MultiTouchProcessing {
 		}
 		System.out.println(sb.toString());
 		*/
+		
+		// Calculate Movement of Blobs
+		processBlobs(blobList);
 	}
 	
-	private void checkMovements(ArrayList<Blob> blobList) {
+	public void applyBlobDetectionWithInterpolData() {
+		double[] inteprolData = interpolator.getInterpolPixels();
+		
+		// Create Blob Finder
+		long millis = System.currentTimeMillis();								//Timestamp for BlobCreation
+		BlobFinder finder = new BlobFinder(interpolator.getPixelWidth(), interpolator.getPixelHeight(), millis);
+		double[] dstData = new double[inteprolData.length];
+		ArrayList<Blob> blobList = new ArrayList<Blob>();
+
+		// Detect Blobs
+		lastBlobId = finder.detectBlobs(inteprolData, dstData, Configuration.minBlobMassInterpolation, -1, blobList, lastBlobId);
+		blobCount = blobList.size();
+
+		// Draw Blobs
+		drawBlobs(blobList);
+				
+		// List Blobs
+		System.out.printf("Found %d blobs:\n", blobList.size());
+		System.out.printf("=================\n");
+		int i=1;
+		StringBuilder sb = new StringBuilder();
+		for(Blob blob: blobList) {
+			sb.append("blob nr."+i+" with "+blob.getMass()+" points.\n");
+			i++;
+		}
+		System.out.println(sb.toString());
+		
+		// Calculate Movement of Blobs
+		processBlobs(blobList);
+	}
+	
+	private void processBlobs(ArrayList<Blob> blobList) {
 		//Print out all blobs
 		System.out.println("\n \n=== NEW BLOB ROUND ===");
 		for(Blob b : blobList)
 			System.out.println(b);
 		System.out.println("=== Calculation starts now ===");
 		
-		//nothing in activeBlobList -> add all of them
-		if(activeBlobs.size() == 0) {
-			System.out.println("active blob size was " + activeBlobs.size() +" -> (1)");
-			//Add each new blob in a new list tot the active blobs (for history)
+		//nothing in activeBasicGestures -> add all of them
+		
+		if(activeBasicGestures.size() == 0) {
+			System.out.println("active gesture count is " + activeBasicGestures.size() +" -> (1)");
+			//Add a new basicgesture for every blob
 			for(Blob b : blobList) {
-				ArrayList<Blob> sbl = new ArrayList<Blob>();		//sbl: single blob list
-				sbl.add(b);
-				activeBlobs.add(sbl);
+				BasicGesture bg = new BasicGesture(lastGestureId, null, false, System.currentTimeMillis(), -1, -1,-1, null);
+				lastGestureId++;
+				ArrayList<Blob> history = new ArrayList<Blob>();		
+				history.add(b);
+				bg.setHistory(history);
+				activeBasicGestures.add(bg);
 			}
 		} else {
-			System.out.println("active blob size was " + activeBlobs.size() +" -> (2)");
-			for(Blob nb : blobList) {
+			System.out.println("active gesture count is " + activeBasicGestures.size() +" -> (2)");
+			for(Blob b : blobList) {
 				boolean found = false;
-				for(List<Blob> sbl : activeBlobs) {
-					Blob ob = sbl.get(sbl.size()-1);
+				for(BasicGesture bg : activeBasicGestures) {
+					List<Blob> history = bg.getHistory();			
+					Blob lastEntry = history.get(history.size()-1);			//Get last entry of history of the basic gesture
+					
 					//System.out.println("Checking following blobs: \n > " + ob + " \n >" + nb + "\n");
-					if( isInRange(nb.getxMiddle(), ob.getxMiddle(), Configuration.blobRangeRadius) &&
-						isInRange(nb.getyMiddle(), ob.getyMiddle(), Configuration.blobRangeRadius)){
-						System.out.println("found matching blob: \n >>" + ob + "\n >>" + nb + " \n -> (3)");
+					if( isInRange(b.getxMiddle(), lastEntry.getxMiddle(), (Configuration.applyInterpolator)?Configuration.blobRangeRadiusInterpolation:Configuration.blobRangeRadius) &&
+						isInRange(b.getyMiddle(), lastEntry.getyMiddle(), (Configuration.applyInterpolator)?Configuration.blobRangeRadiusInterpolation:Configuration.blobRangeRadius)){
+						System.out.println("found matching blob: \n >>" + lastEntry + "\n >>" + b + " \n -> (3)");
 						//Blob seems to be the same -> add to list
-						nb.setId(ob.getId());
-						sbl.add(nb);
+						b.setId(lastEntry.getId());
+						history.add(b);
 						found = true;
 					}
 				}
 				if(!found) {
-					//seems to be a new blob -> add a new list to active blob list
+					//seems to be a new blob -> add a new Basic Gesture
 					System.out.println("no matching blob -> (4)");
-					ArrayList<Blob> sbl = new ArrayList<Blob>();		//sbl: single blob list
-					sbl.add(nb);
-					activeBlobs.add(sbl);
+					BasicGesture bg = new BasicGesture(lastGestureId, null, false, System.currentTimeMillis(), -1, -1, -1, null);
+					lastGestureId++;
+					ArrayList<Blob> history = new ArrayList<Blob>();		
+					history.add(b);
+					bg.setHistory(history);
+					activeBasicGestures.add(bg);
 				}
 			}
 			
-			List<List<Blob>> toRemove = new ArrayList<List<Blob>>();
+			List<BasicGesture> toRemove = new ArrayList<BasicGesture>();
 			
-			//Check if there are some old blobs -> if yes delete them
-			for(List<Blob> sbl : activeBlobs) {
-				Blob ob = sbl.get(sbl.size()-1);
-				if(ob.getCreatedAt() < System.currentTimeMillis()-500){
+			//Check if there are some old gestures -> if yes close them
+			for(BasicGesture bg : activeBasicGestures) {
+				List<Blob> history = bg.getHistory();			
+				Blob lastEntry = history.get(history.size()-1);	
+				if(lastEntry.getCreatedAt() < System.currentTimeMillis()-150){  //70 fuer double touch -> probleme beim move
 					System.out.println("found blob to delete -> (5)");
-					toRemove.add(sbl);
+					toRemove.add(bg);
+					calculateBasicGestureData(bg);
+					System.out.println("new basic gesture recognized: " + bg);
+					printLog("new basic gesture recognized: " + bg);
 				}
 			}
-			activeBlobs.removeAll(toRemove);
-			
+			activeBasicGestures.removeAll(toRemove);
+			historyBasicGestures.addAll(toRemove);
+			/*
 			System.out.println("ACTIVE BLOBS: " + activeBlobs.size());
 			for(List<Blob> sbl : activeBlobs) {
 				Blob b = sbl.get(sbl.size()-1);
 				System.out.println("blob with id: " + b.getId() + " has " + sbl.size() + " pathitems stored");
 			}
-			
+			*/
 		}
 	}
 	
+	private void calculateBasicGestureData(BasicGesture bg) {
+		bg.setTimestampStopped(System.currentTimeMillis());
+		
+		List<Blob> history = bg.getHistory();
+		if(history.size() != 1) {
+			Blob lastEntry = history.get(history.size()-1);	
+			Blob firstEntry = history.get(0);
+			
+			boolean xInRange = isInRange(lastEntry.getxMiddle(),firstEntry.getxMiddle(),Configuration.blobRangeRadius);
+			boolean yInRange = isInRange(lastEntry.getyMiddle(),firstEntry.getyMiddle(),Configuration.blobRangeRadius);
+			boolean xIncreasing = lastEntry.getxMiddle() > firstEntry.getxMiddle();
+			boolean yIncreasing = lastEntry.getyMiddle() > firstEntry.getyMiddle();
+			
+			bg.setxStart((int)firstEntry.getxMiddle());
+			bg.setyStart((int)firstEntry.getyMiddle());
+			bg.setxEnd((int)lastEntry.getxMiddle());
+			bg.setyEnd((int)lastEntry.getyMiddle());
+			
+			if(xInRange) {
+				if(yInRange) {
+					//not moved - movement is null
+				} else {
+					if(yIncreasing)
+						bg.setMovement(Movements.DOWN);
+					else
+						bg.setMovement(Movements.UP);
+				}
+			} else {
+				if(yInRange) {
+					if(xIncreasing)
+						bg.setMovement(Movements.RIGHT);
+					else
+						bg.setMovement(Movements.LEFT);
+				} else {
+					if(xIncreasing) {
+						if(yIncreasing) 
+							bg.setMovement(Movements.DOWNRIGHT);
+						else
+							bg.setMovement(Movements.UPRIGHT);
+					} else {
+						if(yIncreasing) 
+							bg.setMovement(Movements.DOWNLEFT);
+						else
+							bg.setMovement(Movements.UPLEFT);
+					}
+				}
+			}
+			
+			if(bg.getMovement() == null) {
+				bg.setType(BasicGestureType.TOUCH);
+			} else {
+				bg.setType(BasicGestureType.MOVE);
+			}
+		}
+		
+	}
+
 	private boolean isInRange(double a, double b, double maxrange) {
 		double dif = (a-b);
 		if(dif < 0.0)
@@ -606,4 +777,9 @@ public class MultiTouchProcessing {
 		}
 		bw.close();
 	}
+	
+	public void printLog(String output) {
+		infoTextArea.append(output + "\n");
+	}
+
 }

@@ -31,7 +31,10 @@ public class Blob extends JPanel {
 		this.yMiddle = yMin + (double)getBlobHeight()/2;
 		
 		//Stuff for drawing BLOB
-		this.setBounds(this.xMin*Configuration.pixelSize , this.yMin* Configuration.pixelSize, getBlobWidth()*Configuration.pixelSize, getBlobHeight()*Configuration.pixelSize);
+		if (Configuration.applyInterpolator)
+			this.setBounds(this.xMin*Configuration.pixelSizeInterpolation , this.yMin* Configuration.pixelSizeInterpolation, getBlobWidth()*Configuration.pixelSizeInterpolation, getBlobHeight()*Configuration.pixelSizeInterpolation);
+		else
+			this.setBounds(this.xMin*Configuration.pixelSize , this.yMin* Configuration.pixelSize, getBlobWidth()*Configuration.pixelSize, getBlobHeight()*Configuration.pixelSize);
 		this.setBackground(new Color(1f, 1f, 1f, 0.3f));
 		this.setBorder(javax.swing.BorderFactory.createLineBorder(new Color(0.1f, 1f, 1f, 0.9f)));
 	}

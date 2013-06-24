@@ -26,13 +26,20 @@ public class Configuration {
 	
 	// Blob Settings
 	public static boolean blobDetection = true;		// enable/disable blob detection
-	public static double blobTreshold = 0.5;		// treshold for counting to a blob
+	public static double blobTreshold = 0.6;		// treshold for counting to a blob
 	public static double blobRangeRadius = 2;		// how far can a blob move in one measure-loop
+	public static double blobRangeRadiusInterpolation = 8;		// how far can a blob move in one measure-loop
+	public static int minBlobMass = 0;				// how big the blob has to be to be assigned as a blob
+	public static int minBlobMassInterpolation = 4; // - // - for interpolation
 	
 	// Interpolation Settings
 	public static boolean applyInterpolator = true;	// enable/disable interpolation
+	public static InterpolatorType interpolatorUsed = InterpolatorType.CATMULLROM;
 	public static int interpolatorResolution = 3;	// resolution of interpolation. e.g. 3 - calculates 3 pixel out of every original pixel
 	public static int pixelSizeInterpolation = 7;	// size of pixel to display
 	public static int pixelSpaceInterpolation = 0;	// space of pixel
 	
+	public enum InterpolatorType {
+		CUBIC, CATMULLROM
+	}
 }
