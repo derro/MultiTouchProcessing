@@ -19,6 +19,9 @@ public class BasicGesture {
 	private int yEnd;
 	private int averageMass;
 	private Movements movement;
+	private boolean moved; 
+	private boolean sendStatus;
+	private int degree;
 	private List<Blob> history;
 	
 	public BasicGesture() {}
@@ -34,6 +37,8 @@ public class BasicGesture {
 		this.xStart = xStart;
 		this.yStart = yStart;
 		this.movement = momevment;
+		this.moved = false;
+		this.sendStatus = false;
 	}
 
 	public long getId() {
@@ -132,9 +137,37 @@ public class BasicGesture {
 		this.history = history;
 	}
 	
+	public boolean isMoved() {
+		return moved;
+	}
+
+	public void setMoved(boolean moved) {
+		this.moved = moved;
+	}
+
+	public boolean isSendStatus() {
+		return sendStatus;
+	}
+
+	public void setSendStatus(boolean sendStatus) {
+		this.sendStatus = sendStatus;
+	}
+
+	public int getDegree() {
+		return degree;
+	}
+
+	public void setDegree(int degree) {
+		this.degree = degree;
+	}
+	
+	public long getActualDuration() {
+		return System.currentTimeMillis() - this.getTimestampStarted();
+	}
+
 	@Override
 	public String toString() {
-		return "Basic Gesture [id:"+id+", type:"+type+", movement:"+movement+", Start["+xStart+","+yStart+"], End["+xEnd+","+yEnd+"], timestampStarted:"+timestampStarted+", timestampStopped:"+timestampStopped+", duration:"+(timestampStopped-timestampStarted);
+		return "Basic Gesture [id:"+id+", type:"+type+", movement:"+movement+",isMoved:"+moved+",sendStatus:"+sendStatus+", degree:"+degree+", Start["+xStart+","+yStart+"], End["+xEnd+","+yEnd+"], timestampStarted:"+timestampStarted+", timestampStopped:"+timestampStopped+", duration:"+(timestampStopped-timestampStarted);
 	}
 }
 

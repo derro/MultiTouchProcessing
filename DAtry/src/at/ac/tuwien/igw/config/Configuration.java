@@ -32,6 +32,10 @@ public class Configuration {
 	public static int minBlobMass = 0;				// how big the blob has to be to be assigned as a blob
 	public static int minBlobMassInterpolation = 4; // - // - for interpolation
 	
+	// Tap and Hold Setting
+	public static double blobRangeRadiusInterpolationTapAndHold = 3;		// how far can a blob move in one measure-loop
+	public static double blobRangeRadiusTapAndHold = 1;		// how far can a blob move in one measure-loop
+	
 	// Interpolation Settings
 	public static boolean applyInterpolator = true;	// enable/disable interpolation
 	public static InterpolatorType interpolatorUsed = InterpolatorType.CATMULLROM;

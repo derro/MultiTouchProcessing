@@ -1,5 +1,5 @@
 package at.ac.tuwien.igw.types;
 
 public enum BasicGestureType {
-	TOUCH, TOUCHANDHOLD, MOVE
+	TAP, TAPANDHOLD_START, TAPANDHOLD_END, TAPANDHOLD, MOVE
 }

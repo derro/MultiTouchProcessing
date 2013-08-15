@@ -13,9 +13,11 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 
 import javax.swing.JButton;
@@ -32,6 +34,7 @@ import at.ac.tuwien.igw.config.Configuration;
 import at.ac.tuwien.igw.config.Configuration.InterpolatorType;
 import at.ac.tuwien.igw.filtering.GaussianBlur;
 import at.ac.tuwien.igw.gestures.BasicGesture;
+import at.ac.tuwien.igw.gestures.Gesture;
 import at.ac.tuwien.igw.interpolator.Catmullrom;
 import at.ac.tuwien.igw.interpolator.Cubic;
 import at.ac.tuwien.igw.interpolator.Interpolator;
@@ -42,6 +45,7 @@ import at.ac.tuwien.igw.serial.DataManager;
 import at.ac.tuwien.igw.serial.SerialDevice;
 import at.ac.tuwien.igw.state.State;
 import at.ac.tuwien.igw.types.BasicGestureType;
+import at.ac.tuwien.igw.types.CombinedGestureType;
 import at.ac.tuwien.igw.types.Movements;
 
 public class MultiTouchProcessing {
@@ -54,6 +58,7 @@ public class MultiTouchProcessing {
 	public static List<List<Blob>> activeBlobs;
 	public static List<BasicGesture> activeBasicGestures;
 	public static List<BasicGesture> historyBasicGestures;
+	public static List<Gesture> historyCombinedGestures;
 	public static State activeState;
 	
 	public SerialDevice serialDevice = null;
@@ -160,6 +165,7 @@ public class MultiTouchProcessing {
 		activeBlobs = new ArrayList<List<Blob>>();
 		activeBasicGestures = new ArrayList<BasicGesture>();
 		historyBasicGestures = new ArrayList<BasicGesture>();
+		historyCombinedGestures = new ArrayList<Gesture>();
 		
 		if(Configuration.applyInterpolator) {
 			if(Configuration.interpolatorUsed == InterpolatorType.CUBIC)
@@ -271,7 +277,7 @@ public class MultiTouchProcessing {
 				interpolator.interpolate(crosspoints);
 				interpolPixels = interpolator.getInterpolPixels();
 				
-				System.out.println("size of interpol values: " + interpolator.getInterpolPixels().length);
+				//System.out.println("size of interpol values: " + interpolator.getInterpolPixels().length);
 				//printBinaryDataOneDim(interpolPixels, interpolator.getPixelWidth());
 				for (int x = 0; x < interpolator.getPixelWidth(); x++) {
 					for (int y = 0; y <  interpolator.getPixelHeight(); y++) {
@@ -339,7 +345,7 @@ public class MultiTouchProcessing {
 					interpolator.interpolate(crosspoints);
 					interpolPixels = interpolator.getInterpolPixels();
 					
-					System.out.println("size of interpol values: " + interpolator.getInterpolPixels().length);
+					//System.out.println("size of interpol values: " + interpolator.getInterpolPixels().length);
 					//printBinaryDataOneDim(interpolPixels, interpolator.getPixelWidth());
 					for (int x = 0; x < interpolator.getPixelWidth(); x++) {
 						for (int y = 0; y <  interpolator.getPixelHeight(); y++) {
@@ -473,6 +479,7 @@ public class MultiTouchProcessing {
 		drawBlobs(blobList);
 				
 		// List Blobs
+		/*
 		System.out.printf("Found %d blobs:\n", blobList.size());
 		System.out.printf("=================\n");
 		int i=1;
@@ -482,22 +489,26 @@ public class MultiTouchProcessing {
 			i++;
 		}
 		System.out.println(sb.toString());
+		*/
 		
 		// Calculate Movement of Blobs
 		processBlobs(blobList);
 	}
 	
 	private void processBlobs(ArrayList<Blob> blobList) {
-		//Print out all blobs
-		System.out.println("\n \n=== NEW BLOB ROUND ===");
-		for(Blob b : blobList)
-			System.out.println(b);
-		System.out.println("=== Calculation starts now ===");
+		boolean debug = false;
 		
+		//Print out all blobs
+		if(debug) {
+			System.out.println("\n \n=== NEW BLOB ROUND ===");
+			for(Blob b : blobList)
+				System.out.println(b);
+			System.out.println("=== Calculation starts now ===");
+		}
 		//nothing in activeBasicGestures -> add all of them
 		
 		if(activeBasicGestures.size() == 0) {
-			System.out.println("active gesture count is " + activeBasicGestures.size() +" -> (1)");
+			if(debug) System.out.println("active gesture count is " + activeBasicGestures.size() +" -> (1)");
 			//Add a new basicgesture for every blob
 			for(Blob b : blobList) {
 				BasicGesture bg = new BasicGesture(lastGestureId, null, false, System.currentTimeMillis(), -1, -1,-1, null);
@@ -508,7 +519,7 @@ public class MultiTouchProcessing {
 				activeBasicGestures.add(bg);
 			}
 		} else {
-			System.out.println("active gesture count is " + activeBasicGestures.size() +" -> (2)");
+			if(debug) System.out.println("active gesture count is " + activeBasicGestures.size() +" -> (2)");
 			for(Blob b : blobList) {
 				boolean found = false;
 				for(BasicGesture bg : activeBasicGestures) {
@@ -516,18 +527,41 @@ public class MultiTouchProcessing {
 					Blob lastEntry = history.get(history.size()-1);			//Get last entry of history of the basic gesture
 					
 					//System.out.println("Checking following blobs: \n > " + ob + " \n >" + nb + "\n");
+					
+					//Check if blob is standing still (TAP AND HOLD)
+					//Check if blob is moving
 					if( isInRange(b.getxMiddle(), lastEntry.getxMiddle(), (Configuration.applyInterpolator)?Configuration.blobRangeRadiusInterpolation:Configuration.blobRangeRadius) &&
 						isInRange(b.getyMiddle(), lastEntry.getyMiddle(), (Configuration.applyInterpolator)?Configuration.blobRangeRadiusInterpolation:Configuration.blobRangeRadius)){
-						System.out.println("found matching blob: \n >>" + lastEntry + "\n >>" + b + " \n -> (3)");
+						if(debug) System.out.println("found matching blob: \n >>" + lastEntry + "\n >>" + b + " \n -> (3)");
 						//Blob seems to be the same -> add to list
 						b.setId(lastEntry.getId());
 						history.add(b);
 						found = true;
+						
+						if( isInRange(b.getxMiddle(), lastEntry.getxMiddle(), (Configuration.applyInterpolator)?Configuration.blobRangeRadiusInterpolationTapAndHold:Configuration.blobRangeRadiusTapAndHold) &&
+							isInRange(b.getyMiddle(), lastEntry.getyMiddle(), (Configuration.applyInterpolator)?Configuration.blobRangeRadiusInterpolationTapAndHold:Configuration.blobRangeRadiusTapAndHold)){
+							if(!bg.isMoved() && bg.getActualDuration() >= 500) {
+								bg.setType(BasicGestureType.TAPANDHOLD_START);
+								if(!bg.isSendStatus()) {
+									newBasicGestureFinished(bg);
+									bg.setSendStatus(true);
+								}
+							}
+						} else {
+							bg.setMoved(true);
+							if(bg.getType() == BasicGestureType.TAPANDHOLD_START) {
+								bg.setType(BasicGestureType.TAPANDHOLD_END);
+								newBasicGestureFinished(bg);
+							}
+							//RESET status
+							bg.setType(null);
+						}
 					}
+					
 				}
 				if(!found) {
 					//seems to be a new blob -> add a new Basic Gesture
-					System.out.println("no matching blob -> (4)");
+					if(debug) System.out.println("no matching blob -> (4)");
 					BasicGesture bg = new BasicGesture(lastGestureId, null, false, System.currentTimeMillis(), -1, -1, -1, null);
 					lastGestureId++;
 					ArrayList<Blob> history = new ArrayList<Blob>();		
@@ -543,11 +577,12 @@ public class MultiTouchProcessing {
 			for(BasicGesture bg : activeBasicGestures) {
 				List<Blob> history = bg.getHistory();			
 				Blob lastEntry = history.get(history.size()-1);	
-				if(lastEntry.getCreatedAt() < System.currentTimeMillis()-150){  //70 fuer double touch -> probleme beim move
-					System.out.println("found blob to delete -> (5)");
+				if(lastEntry.getCreatedAt() < System.currentTimeMillis()-150){  //70 fuer double touch -> probleme beim move //150 for move
+					if(debug) System.out.println("found blob to delete -> (5)");
 					toRemove.add(bg);
 					calculateBasicGestureData(bg);
-					System.out.println("new basic gesture recognized: " + bg);
+					newBasicGestureFinished(bg);
+					if(debug) System.out.println("new basic gesture recognized: " + bg);
 					printLog("new basic gesture recognized: " + bg);
 				}
 			}
@@ -563,58 +598,189 @@ public class MultiTouchProcessing {
 		}
 	}
 	
+	private void newBasicGestureFinished(BasicGesture bg) {
+		boolean debug = true;
+		
+		if(debug) System.out.println("new basic gesture finished: " + bg);
+		long timestamp = System.currentTimeMillis();
+		
+		if(bg.getType() == BasicGestureType.TAP){
+			//Look if there is already a Tap from the last xxx milliseconds
+			List<Gesture> history = getLatestCombinedGestures(timestamp-500, CombinedGestureType.TAP);
+			List<BasicGesture> basicGestures = new ArrayList<BasicGesture>();
+			if(history.size() == 0) {
+				//fire single tap
+				basicGestures.add(bg);
+				Gesture g = new Gesture(1, CombinedGestureType.TAP, basicGestures, timestamp);
+				historyCombinedGestures.add(g);
+				//TODO: shoot to higher logic!
+				if(debug) System.out.println("HIGH LEVEL GESTURE:" + g);
+				printLog(">> GESTURE:" + g);
+			 } else {
+				 for(Gesture hg : history) {
+					if(isInRange(hg.getBasicGestures().get(0).getxEnd(),bg.getxEnd(),Configuration.blobRangeRadius) &&
+					   isInRange(hg.getBasicGestures().get(0).getyEnd(),bg.getyEnd(),Configuration.blobRangeRadius)) {
+						//fire double tap
+						basicGestures.add(hg.getBasicGestures().get(0));
+						basicGestures.add(bg);
+						Gesture g = new Gesture(1, CombinedGestureType.DOUBLETAP, basicGestures, timestamp);
+						historyCombinedGestures.add(g);
+						//TODO: shoot to higher logic!
+						if(debug) System.out.println("HIGH LEVEL GESTURE:" + g);
+						printLog(">> GESTURE:" + g);
+						break;
+					}
+				 }
+			 }
+		}
+		if(bg.getType() == BasicGestureType.TAPANDHOLD_START) {
+			List<BasicGesture> basicGestures = new ArrayList<BasicGesture>();
+			basicGestures.add(bg);
+			
+			Gesture g = new Gesture(1, CombinedGestureType.TAPANDHOLD_START, basicGestures, timestamp);
+			historyCombinedGestures.add(g);
+			//TODO: shoot to higher logic!
+			
+			if(debug) System.out.println("HIGH LEVEL GESTURE:" + g);
+			printLog(">> GESTURE:" + g);
+		}
+		if(bg.getType() == BasicGestureType.TAPANDHOLD_END) {
+			List<BasicGesture> basicGestures = new ArrayList<BasicGesture>();
+			basicGestures.add(bg);
+			
+			Gesture g = new Gesture(1, CombinedGestureType.TAPANDHOLD_END, basicGestures, timestamp);
+			historyCombinedGestures.add(g);
+			//TODO: shoot to higher logic!
+			
+			if(debug) System.out.println("HIGH LEVEL GESTURE:" + g);
+			printLog(">> GESTURE:" + g);
+		}
+		
+	}
+	
+	private List<BasicGesture> getLatestBasicGestures(long timestamp, BasicGestureType filterType) {
+		List<BasicGesture> history = new ArrayList<BasicGesture>();
+		boolean stopWhile = false;
+
+		int historySize = historyBasicGestures.size()-1;
+		do {
+			if(historySize >= 0) {
+				BasicGesture bg = historyBasicGestures.get(historySize);
+				if(bg.getTimestampStopped() >= timestamp) {
+					if(filterType == null || filterType == bg.getType()) {
+						history.add(bg);
+					}	
+				}	
+				else {
+					stopWhile = true;
+				}	
+			} else {
+				stopWhile = true;
+			}	
+		} while (!stopWhile);
+		System.out.println("getLatestBasicGestures >> history size: " + history.size());
+		return history;
+	}
+	
+	private List<Gesture> getLatestCombinedGestures(long timestamp, CombinedGestureType filterType) {
+		List<Gesture> history = new ArrayList<Gesture>();
+		
+		ListIterator<Gesture> iter = historyCombinedGestures.listIterator(historyCombinedGestures.size());
+		while(iter.hasPrevious()) {
+			Gesture g = iter.previous();
+			if(g.getTimestamp() >= timestamp) {
+				if(filterType == null || filterType == g.getType()) {
+					history.add(g);
+				}
+			} else {
+				break;
+			}
+		}
+		System.out.println("getLatestCombinedGestures >> history size: " + history.size());
+		
+		return history;
+	}
+
 	private void calculateBasicGestureData(BasicGesture bg) {
 		bg.setTimestampStopped(System.currentTimeMillis());
 		
-		List<Blob> history = bg.getHistory();
-		if(history.size() != 1) {
-			Blob lastEntry = history.get(history.size()-1);	
-			Blob firstEntry = history.get(0);
-			
-			boolean xInRange = isInRange(lastEntry.getxMiddle(),firstEntry.getxMiddle(),Configuration.blobRangeRadius);
-			boolean yInRange = isInRange(lastEntry.getyMiddle(),firstEntry.getyMiddle(),Configuration.blobRangeRadius);
-			boolean xIncreasing = lastEntry.getxMiddle() > firstEntry.getxMiddle();
-			boolean yIncreasing = lastEntry.getyMiddle() > firstEntry.getyMiddle();
-			
-			bg.setxStart((int)firstEntry.getxMiddle());
-			bg.setyStart((int)firstEntry.getyMiddle());
-			bg.setxEnd((int)lastEntry.getxMiddle());
-			bg.setyEnd((int)lastEntry.getyMiddle());
-			
-			if(xInRange) {
-				if(yInRange) {
-					//not moved - movement is null
-				} else {
-					if(yIncreasing)
-						bg.setMovement(Movements.DOWN);
-					else
-						bg.setMovement(Movements.UP);
+		if(bg.getType() == BasicGestureType.TAPANDHOLD_START)
+			bg.setType(BasicGestureType.TAPANDHOLD_END);
+		else {
+			List<Blob> history = bg.getHistory();
+			if(history.size() != 1) {
+				Blob lastEntry = history.get(history.size()-1);	
+				Blob firstEntry = history.get(0);
+				
+				boolean xInRange = isInRange(lastEntry.getxMiddle(),firstEntry.getxMiddle(),Configuration.blobRangeRadius);
+				boolean yInRange = isInRange(lastEntry.getyMiddle(),firstEntry.getyMiddle(),Configuration.blobRangeRadius);
+				
+				bg.setxStart((int)firstEntry.getxMiddle());
+				bg.setyStart((int)firstEntry.getyMiddle());
+				bg.setxEnd((int)lastEntry.getxMiddle());
+				bg.setyEnd((int)lastEntry.getyMiddle());
+				
+				if(xInRange && yInRange) { 
+					//not a movement
 				}
-			} else {
-				if(yInRange) {
-					if(xIncreasing)
+				else {	
+					int degree = (int) Math.toDegrees(Math.atan2((bg.getyEnd()-bg.getyStart()),(bg.getxEnd()-bg.getxStart())));
+					bg.setDegree(degree);
+				
+					if( -23 <= degree && degree < 23)
 						bg.setMovement(Movements.RIGHT);
-					else
+					if(  23 <= degree && degree < 68)
+						bg.setMovement(Movements.DOWNRIGHT);
+					if(  68 <= degree && degree < 113)
+						bg.setMovement(Movements.DOWN);
+					if( 113 <= degree && degree < 158)
+						bg.setMovement(Movements.DOWNLEFT);
+					if( 158 <= degree || degree <= -158)
 						bg.setMovement(Movements.LEFT);
-				} else {
-					if(xIncreasing) {
-						if(yIncreasing) 
-							bg.setMovement(Movements.DOWNRIGHT);
-						else
-							bg.setMovement(Movements.UPRIGHT);
+					if(-158 < degree  && degree <= -113)
+						bg.setMovement(Movements.UPLEFT);
+					if(-113 < degree  && degree <= -68)
+						bg.setMovement(Movements.UP);
+					if(-68 < degree  && degree <= -23)
+						bg.setMovement(Movements.UPRIGHT);
+				}
+				/*
+				if(xInRange) {
+					if(yInRange) {
+						//not moved - movement is null
 					} else {
-						if(yIncreasing) 
-							bg.setMovement(Movements.DOWNLEFT);
+						if(yIncreasing)
+							bg.setMovement(Movements.DOWN);
 						else
-							bg.setMovement(Movements.UPLEFT);
+							bg.setMovement(Movements.UP);
+					}
+				} else {
+					if(yInRange) {
+						if(xIncreasing)
+							bg.setMovement(Movements.RIGHT);
+						else
+							bg.setMovement(Movements.LEFT);
+					} else {
+						if(xIncreasing) {
+							if(yIncreasing) 
+								bg.setMovement(Movements.DOWNRIGHT);
+							else
+								bg.setMovement(Movements.UPRIGHT);
+						} else {
+							if(yIncreasing) 
+								bg.setMovement(Movements.DOWNLEFT);
+							else
+								bg.setMovement(Movements.UPLEFT);
+						}
 					}
 				}
-			}
-			
-			if(bg.getMovement() == null) {
-				bg.setType(BasicGestureType.TOUCH);
-			} else {
-				bg.setType(BasicGestureType.MOVE);
+				*/
+				
+				if(bg.getMovement() == null) {
+					bg.setType(BasicGestureType.TAP);
+				} else {
+					bg.setType(BasicGestureType.MOVE);
+				}
 			}
 		}
 		
